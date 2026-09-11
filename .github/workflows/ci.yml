@@ -1,0 +1,59 @@
+name: CI
+
+on:
+  push:
+    branches: ['**']
+    tags-ignore: ['*']
+  pull_request:
+    branches: [main]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.44.8'
+          channel: 'stable'
+
+      - name: Fetch analysis config
+        run: |
+          curl -fsSL https://raw.githubusercontent.com/Syzygy-Hub/.github/main/engineering/tooling/flutter/analysis_options.yaml \
+            -o analysis_options.yaml
+
+      - name: Get dependencies
+        run: flutter pub get
+
+      - name: Analyze
+        run: flutter analyze --fatal-warnings
+
+      - name: Test with coverage
+        run: flutter test --coverage
+
+      - name: Upload coverage
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage
+          path: coverage
+          if-no-files-found: warn
+
+      - name: Coverage summary
+        run: |
+          if [ -f coverage/lcov.info ]; then
+            LINES_FOUND=$(grep -c "^DA:" coverage/lcov.info || echo 0)
+            LINES_HIT=$(grep "^DA:" coverage/lcov.info | grep -cv ",0$" || echo 0)
+            {
+              echo "## Coverage Report"
+              echo "Lines found: $LINES_FOUND"
+              echo "Lines hit: $LINES_HIT"
+              if [ "$LINES_FOUND" -gt 0 ]; then
+                PCT=$(( LINES_HIT * 100 / LINES_FOUND ))
+                echo "Coverage: ${PCT}%"
+              fi
+            } >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "## Coverage Report — lcov.info not found." >> "$GITHUB_STEP_SUMMARY"
+          fi

@@ -1,0 +1,9 @@
+# Syzygy Repository Manifest
+name: syzygy-services-flutter
+type: services
+platform: flutter
+language: dart
+package_manager: pub.dev
+license: MIT
+version: 1.0.0
+syzygy_foundation: ">=1.1.0"

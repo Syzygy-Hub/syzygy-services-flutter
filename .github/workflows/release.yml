@@ -1,0 +1,14 @@
+name: Release
+
+on:
+  push:
+    tags: ['*']
+
+permissions:
+  contents: write
+  id-token: write
+
+jobs:
+  release:
+    uses: Syzygy-Hub/.github/.github/workflows/flutter-release.yml@main
+    secrets: inherit
