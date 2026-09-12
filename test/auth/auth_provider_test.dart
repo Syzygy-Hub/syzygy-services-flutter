@@ -34,14 +34,14 @@ void main() {
     });
 
     test('authenticate transitions state to Authenticated', () {
-      final token = AuthToken(accessToken: _validJwt);
+      const token = AuthToken(accessToken: _validJwt);
       auth.authenticate(token);
       expect(auth.state, isA<Authenticated>());
       expect((auth.state as Authenticated).token.accessToken, _validJwt);
     });
 
     test('signOut transitions state back to Unauthenticated', () {
-      auth.authenticate(AuthToken(accessToken: _validJwt));
+      auth.authenticate(const AuthToken(accessToken: _validJwt));
       auth.signOut();
       expect(auth.state, isA<Unauthenticated>());
     });
@@ -50,7 +50,7 @@ void main() {
       final states = <AuthState>[];
       final sub = auth.stateStream.listen(states.add);
 
-      auth.authenticate(AuthToken(accessToken: _validJwt));
+      auth.authenticate(const AuthToken(accessToken: _validJwt));
       auth.signOut();
 
       await Future<void>.delayed(Duration.zero);
@@ -63,7 +63,7 @@ void main() {
 
     test('token is persisted to storage on authenticate', () {
       const key = StorageKey<String>('auth.accessToken');
-      auth.authenticate(AuthToken(accessToken: _validJwt));
+      auth.authenticate(const AuthToken(accessToken: _validJwt));
       expect(storage.getSecure<String>(key), _validJwt);
     });
 

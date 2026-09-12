@@ -31,7 +31,7 @@ void main() {
       final payloads = <NotificationPayload>[];
       final sub = provider.onNotification.listen(payloads.add);
 
-      final payload = NotificationPayload(
+      const payload = NotificationPayload(
         title: 'Hello',
         body: 'World',
         data: {'key': 'value'},
