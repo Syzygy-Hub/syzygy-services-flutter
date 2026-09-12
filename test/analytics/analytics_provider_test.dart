@@ -1,11 +1,48 @@
-import 'package:test/test.dart';
+import 'package:syzygy_foundation_flutter/syzygy_foundation_flutter.dart';
 import 'package:syzygy_services_flutter/syzygy_services_flutter.dart';
+import 'package:test/test.dart';
 
 void main() {
-  group('AnalyticsProvider', () {
-    test('ConsoleAnalyticsProvider tracks event without throwing', () {
-      final provider = ConsoleAnalyticsProvider();
-      expect(() => provider.track('test_event', properties: {'key': 'value'}), returnsNormally);
+  late InMemoryAnalyticsProvider analytics;
+
+  setUp(() => analytics = InMemoryAnalyticsProvider());
+
+  group('InMemoryAnalyticsProvider', () {
+    test('sessionId is non-empty', () {
+      expect(analytics.sessionId, isNotEmpty);
+    });
+
+    test('track stores the event', () {
+      final event = AnalyticsEvent(name: 'button_tapped');
+      analytics.track(event);
+      expect(analytics.events, contains(event));
+    });
+
+    test('identify stores user properties', () {
+      analytics.identify('user1', {'plan': 'pro'});
+      expect(analytics.userProperties('user1'), {'plan': 'pro'});
+    });
+
+    test('trackScreen adds to screenViews and events', () {
+      analytics.trackScreen('HomeScreen');
+      expect(analytics.screenViews, contains('HomeScreen'));
+      expect(analytics.events.any((e) => e.name == 'screen_view'), isTrue);
+    });
+
+    test('reset clears events, properties and screen views', () {
+      analytics.track(AnalyticsEvent(name: 'x'));
+      analytics.identify('u', {'k': 'v'});
+      analytics.trackScreen('S');
+      analytics.reset();
+      expect(analytics.events, isEmpty);
+      expect(analytics.screenViews, isEmpty);
+      expect(analytics.userProperties('u'), isNull);
+    });
+
+    test('multiple events are tracked in order', () {
+      analytics.track(AnalyticsEvent(name: 'a'));
+      analytics.track(AnalyticsEvent(name: 'b'));
+      expect(analytics.events.map((e) => e.name).toList(), ['a', 'b']);
     });
   });
 }

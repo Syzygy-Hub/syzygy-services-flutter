@@ -1,19 +1,59 @@
 import 'dart:io';
 
-/// Defines the contract for accessing device information.
-abstract class DeviceProvider {
-  /// The OS name (e.g. 'macos', 'linux', 'android', 'ios').
-  String get operatingSystem;
+import 'package:syzygy_foundation_flutter/syzygy_foundation_flutter.dart';
 
-  /// The OS version string.
-  String get operatingSystemVersion;
+import '../persistence/storage_provider.dart';
+
+const _deviceIdKey = StorageKey<String>('device.id');
+
+/// Abstract contract for accessing device-level metadata.
+abstract class DeviceProvider {
+  /// A stable, persistent unique identifier for this device.
+  String get deviceId;
+
+  /// Platform identifier — always `'flutter'` for this package.
+  String get platform;
+
+  /// The operating system version string (e.g. `'macOS 14.0'`).
+  String get osVersion;
+
+  /// The application version string (e.g. `'1.0.0'`).
+  String get appVersion;
+
+  /// Whether the app is running inside a simulator / emulator.
+  bool get isSimulator;
 }
 
-/// A [DeviceProvider] backed by [Platform].
-class PlatformDeviceProvider implements DeviceProvider {
-  @override
-  String get operatingSystem => Platform.operatingSystem;
+/// [DeviceProvider] backed by [dart:io] and [InMemoryStorageProvider].
+///
+/// The [deviceId] is generated once and persisted via [StorageProvider] so
+/// it survives process restarts within the same storage instance.
+class IoDeviceProvider implements DeviceProvider {
+  final InMemoryStorageProvider _storage;
+
+  /// Creates an [IoDeviceProvider] that persists the device ID via [storage].
+  IoDeviceProvider(this._storage);
 
   @override
-  String get operatingSystemVersion => Platform.operatingSystemVersion;
+  String get deviceId {
+    final existing = _storage.get<String>(_deviceIdKey);
+    if (existing != null) return existing;
+    final id = SyzygyID.generate<IoDeviceProvider>().rawValue;
+    _storage.set<String>(id, _deviceIdKey);
+    return id;
+  }
+
+  @override
+  String get platform => 'flutter';
+
+  @override
+  String get osVersion => Platform.operatingSystemVersion;
+
+  @override
+  String get appVersion => '1.0.0';
+
+  @override
+  bool get isSimulator =>
+      Platform.environment.containsKey('SIMULATOR_DEVICE_NAME') ||
+      Platform.environment.containsKey('SIMULATOR_UDID');
 }
