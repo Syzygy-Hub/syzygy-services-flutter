@@ -74,5 +74,14 @@ void main() {
     test('jwtIsExpired returns true for past exp', () {
       expect(jwtIsExpired(_expiredJwt), isTrue);
     });
+
+    test('canUseBiometric returns false', () async {
+      expect(await auth.canUseBiometric(), isFalse);
+    });
+
+    test('authenticateWithBiometric returns unauthenticated', () async {
+      final result = await auth.authenticateWithBiometric('Please authenticate');
+      expect(result, isA<Unauthenticated>());
+    });
   });
 }

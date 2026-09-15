@@ -3,6 +3,7 @@ import 'dart:convert';
 
 import 'package:syzygy_foundation_flutter/syzygy_foundation_flutter.dart';
 
+import '../networking/network_client.dart';
 import '../persistence/storage_provider.dart';
 
 // Storage keys used to persist tokens across restarts.
@@ -42,19 +43,40 @@ bool jwtIsExpired(String token) {
 /// [InMemoryStorageProvider].
 ///
 /// Tokens are persisted via the storage layer so they survive provider
-/// reconstruction within a process. Refresh is stubbed — callers can subclass
-/// and override [refresh].
+/// reconstruction within a process.
+///
+/// Pass [refreshEndpoint] and [networkClient] to enable real token refresh via
+/// an HTTP POST to the endpoint. When omitted the provider falls back to
+/// returning the existing token unchanged (stub behaviour).
+///
+/// Auto-refresh behaviour: callers should check [TokenAuthProvider.isExpiredAndShouldRefresh]
+/// before issuing requests, or use [executeWithAutoRefresh] to have the provider
+/// detect an expired JWT and refresh transparently.
 class TokenAuthProvider implements AuthProvider {
   final InMemoryStorageProvider _storage;
   final _controller = StreamController<AuthState>.broadcast();
   AuthState _state = const Unauthenticated();
 
+  /// Optional HTTP client used for the token-refresh network call.
+  final HttpNetworkClient? networkClient;
+
+  /// URL that accepts a POST with `{"refreshToken": "<rt>"}` and returns
+  /// `{"accessToken": "<at>", "refreshToken": "<rt>"}`.
+  final String? refreshEndpoint;
+
   /// Creates a [TokenAuthProvider] backed by [storage].
-  TokenAuthProvider(this._storage) {
+  ///
+  /// Supply [networkClient] and [refreshEndpoint] to enable real token refresh.
+  TokenAuthProvider(
+    this._storage, {
+    this.networkClient,
+    this.refreshEndpoint,
+  }) {
     // Restore state from storage.
     final saved = _storage.getSecure<String>(_accessTokenKey);
     if (saved != null) {
-      final token = AuthToken(accessToken: saved,
+      final token = AuthToken(
+          accessToken: saved,
           refreshToken: _storage.getSecure<String>(_refreshTokenKey));
       _state = token.isExpired ? AuthExpired(token) : Authenticated(token);
     }
@@ -75,6 +97,17 @@ class TokenAuthProvider implements AuthProvider {
     _setState(Authenticated(token));
   }
 
+  /// Refreshes the access token.
+  ///
+  /// When [networkClient] and [refreshEndpoint] are configured, performs a
+  /// real HTTP POST to [refreshEndpoint] with the current refresh token,
+  /// parses the response, persists the new tokens, and emits [Authenticated].
+  ///
+  /// On network failure or an error response the tokens are cleared and
+  /// [AuthState.unauthenticated] is emitted before re-throwing.
+  ///
+  /// Falls back to returning the existing token unchanged when no network
+  /// client is configured (useful in tests and stub scenarios).
   @override
   Future<AuthToken> refresh() async {
     final current = _state;
@@ -82,25 +115,104 @@ class TokenAuthProvider implements AuthProvider {
       throw const NetworkUnavailableAuthError();
     }
     _setState(const Refreshing());
-    // Stub: subclasses should override and call a real network endpoint.
+
+    final client = networkClient;
+    final endpoint = refreshEndpoint;
+
+    if (client != null && endpoint != null) {
+      try {
+        final rt = current.token?.refreshToken;
+        final response = await client.post(
+          endpoint,
+          body: {'refreshToken': rt ?? ''},
+        );
+
+        if (!response.isSuccess) {
+          _clearAndSignOut();
+          throw TokenRefreshFailedError(
+              'Refresh endpoint returned ${response.statusCode}');
+        }
+
+        final body = jsonDecode(utf8.decode(response.data));
+        if (body is! Map<String, dynamic>) {
+          _clearAndSignOut();
+          throw const TokenRefreshFailedError('Invalid refresh response body');
+        }
+
+        final newAccess = body['accessToken'] as String?;
+        final newRefresh = body['refreshToken'] as String?;
+
+        if (newAccess == null || newAccess.isEmpty) {
+          _clearAndSignOut();
+          throw const TokenRefreshFailedError('Missing accessToken in response');
+        }
+
+        final newToken =
+            AuthToken(accessToken: newAccess, refreshToken: newRefresh);
+        _storage.setSecure<String>(newAccess, _accessTokenKey);
+        if (newRefresh != null) {
+          _storage.setSecure<String>(newRefresh, _refreshTokenKey);
+        }
+        _setState(Authenticated(newToken));
+        return newToken;
+      } catch (e) {
+        if (e is TokenRefreshFailedError) rethrow;
+        _clearAndSignOut();
+        throw TokenRefreshFailedError('Token refresh failed: $e');
+      }
+    }
+
+    // Stub path: no network client configured — return existing token.
     await Future<void>.delayed(const Duration(milliseconds: 1));
     final token = current.token!;
-    // Return the same token unchanged (stub behaviour).
     _setState(Authenticated(token));
     return token;
   }
 
-  @override
-  void signOut() {
+  /// Checks whether the current access token is expired and, if so, calls
+  /// [refresh] automatically before returning.
+  ///
+  /// Returns the current (possibly refreshed) [AuthToken], or throws
+  /// [NetworkUnavailableAuthError] when not authenticated.
+  Future<AuthToken> executeWithAutoRefresh() async {
+    final current = _state;
+    if (current is Unauthenticated) throw const NetworkUnavailableAuthError();
+
+    final token = current.token;
+    if (token != null && jwtIsExpired(token.accessToken)) {
+      return refresh();
+    }
+
+    if (token == null) throw const NetworkUnavailableAuthError();
+    return token;
+  }
+
+  void _clearAndSignOut() {
     _storage.removeSecure<String>(_accessTokenKey);
     _storage.removeSecure<String>(_refreshTokenKey);
     _setState(const Unauthenticated());
+  }
+
+  @override
+  void signOut() {
+    _clearAndSignOut();
   }
 
   void _setState(AuthState next) {
     _state = next;
     _controller.add(next);
   }
+
+  /// Returns whether biometric authentication is available on this device.
+  /// Always returns `false` in the stub. Wire to `local_auth` package's
+  /// `LocalAuthentication.canCheckBiometrics` for real Face ID / Touch ID / fingerprint support.
+  Future<bool> canUseBiometric() async => false;
+
+  /// Authenticates the user with biometrics.
+  /// [reason] is the localized reason shown to the user in the system prompt.
+  /// Returns [Unauthenticated] on the stub. Wire to `local_auth` for real usage.
+  Future<AuthState> authenticateWithBiometric(String reason) async =>
+      const Unauthenticated();
 
   /// Disposes the stream controller.
   void dispose() => _controller.close();
@@ -112,5 +224,19 @@ class NetworkUnavailableAuthError implements Exception {
   const NetworkUnavailableAuthError();
 
   @override
-  String toString() => 'NetworkUnavailableAuthError: no active session to refresh';
+  String toString() =>
+      'NetworkUnavailableAuthError: no active session to refresh';
 }
+
+/// Thrown when the refresh endpoint returns an error or an unexpected response.
+class TokenRefreshFailedError implements Exception {
+  /// Human-readable reason for the failure.
+  final String reason;
+
+  /// Creates a [TokenRefreshFailedError].
+  const TokenRefreshFailedError(this.reason);
+
+  @override
+  String toString() => 'TokenRefreshFailedError: $reason';
+}
+

@@ -38,28 +38,84 @@ abstract class RequestInterceptor {
   Future<NetworkRequest> intercept(NetworkRequest request);
 }
 
+/// Signature for the injectable delay used between retry attempts.
+///
+/// Defaults to [Future.delayed] in production.  Inject a custom
+/// implementation in tests to record requested [Duration]s without incurring
+/// real wall-clock time — matching the clock-injection pattern used in the
+/// Android `OkHttpNetworkClient`.
+///
+/// ```dart
+/// // Record delays without waiting:
+/// final recorded = <Duration>[];
+/// final client = HttpNetworkClient(
+///   backoffClock: (d) async => recorded.add(d),
+/// );
+/// ```
+typedef BackoffClock = Future<void> Function(Duration duration);
+
+/// Concrete [BackoffClock] implementation that records requested [Duration]s
+/// without incurring real wall-clock time.
+///
+/// Inject into [HttpNetworkClient] in tests for deterministic backoff-timing
+/// assertions — no real sleep, no flaky timing, mirrors the Android clock-injection pattern.
+///
+/// ```dart
+/// final clock = RecordingBackoffClock();
+/// final client = HttpNetworkClient(backoffClock: clock.call);
+/// // ... exercise client ...
+/// expect(clock.durations[0], equals(const Duration(milliseconds: 200)));
+/// ```
+class RecordingBackoffClock {
+  /// All durations passed to this clock, in order.
+  final durations = <Duration>[];
+
+  /// Records [d] without waiting.
+  Future<void> call(Duration d) async {
+    durations.add(d);
+  }
+}
+
 /// Concrete HTTP client implementing [NetworkClientProtocol].
 ///
 /// Supports GET, POST, PUT, DELETE, PATCH, HEAD with:
 /// - Configurable [timeout]
 /// - Pluggable [interceptors]
 /// - Exponential-backoff retry (max [maxRetries] attempts)
+/// - Injectable [backoffClock] for deterministic testing
+/// - Optional [logger] for request/response/error logging (null = zero overhead)
 class HttpNetworkClient implements NetworkClientProtocol {
   final HttpClient _client;
   final Duration timeout;
   final int maxRetries;
   final List<RequestInterceptor> interceptors;
 
+  /// Delay function inserted between retry attempts.
+  ///
+  /// Defaults to [Future.delayed] so production behaviour is unchanged.
+  /// Override in tests to avoid real waiting and to assert the exact
+  /// [Duration]s the backoff algorithm computes.
+  final BackoffClock backoffClock;
+
+  /// Optional logger. When non-null, each request and response is logged.
+  /// Authorization headers are never logged. When null, no overhead is incurred.
+  final LoggerProtocol? logger;
+
   /// Creates an [HttpNetworkClient].
   ///
   /// [client] is optional; a new [HttpClient] is used when omitted.
+  /// [backoffClock] is optional; defaults to [Future.delayed].
+  /// [logger] is optional; defaults to null (no logging).
   HttpNetworkClient({
     HttpClient? client,
     this.timeout = const Duration(seconds: 30),
     this.maxRetries = 3,
     List<RequestInterceptor>? interceptors,
+    BackoffClock? backoffClock,
+    this.logger,
   })  : _client = client ?? HttpClient(),
-        interceptors = interceptors ?? [] {
+        interceptors = interceptors ?? [],
+        backoffClock = backoffClock ?? Future<void>.delayed {
     _client.connectionTimeout = timeout;
   }
 
@@ -81,7 +137,7 @@ class HttpNetworkClient implements NetworkClientProtocol {
       if (e.code == SyzygyErrorCode.timeout ||
           e.code == SyzygyErrorCode.networkUnavailable) {
         final delay = Duration(milliseconds: 200 * (1 << attempt));
-        await Future<void>.delayed(delay);
+        await backoffClock(delay);
         return _executeWithRetry(request, attempt + 1);
       }
       rethrow;
@@ -91,6 +147,19 @@ class HttpNetworkClient implements NetworkClientProtocol {
   Future<NetworkResponse> _doExecute(NetworkRequest request) async {
     final uri = Uri.parse(request.url);
     final method = request.method.value;
+
+    // Log the outgoing request, omitting the Authorization header.
+    if (logger != null) {
+      final safeHeaders = Map<String, String>.from(request.headers)
+        ..remove('Authorization')
+        ..remove('authorization');
+      logger!.info('NetworkClient → $method ${request.url}', metadata: {
+        'headers': safeHeaders.toString(),
+        'body_size': '${request.body?.length ?? 0}',
+      });
+    }
+
+    final stopwatch = Stopwatch()..start();
     late HttpClientRequest httpReq;
 
     try {
@@ -101,11 +170,13 @@ class HttpNetworkClient implements NetworkClientProtocol {
                 message: 'Request timed out: ${request.url}',
               ));
     } on SocketException catch (e) {
-      throw NetworkError(
+      final err = NetworkError(
         code: SyzygyErrorCode.networkUnavailable,
         message: 'Network unavailable: $e',
         underlyingError: e,
       );
+      logger?.error('NetworkClient ← SOCKET ERROR ${request.url}', error: err);
+      throw err;
     }
 
     request.headers.forEach(httpReq.headers.set);
@@ -144,11 +215,25 @@ class HttpNetworkClient implements NetworkClientProtocol {
     );
 
     if (response.isServerError) {
-      throw NetworkError(
+      final error = NetworkError(
         code: SyzygyErrorCode.serverError,
         message: 'Server error ${httpRes.statusCode}',
       );
+      logger?.error('NetworkClient ← ERROR ${request.url}', error: error,
+          metadata: {
+            'status': '${httpRes.statusCode}',
+            'elapsed_ms': '${stopwatch.elapsedMilliseconds}',
+          });
+      throw error;
     }
+
+    logger?.info(
+        'NetworkClient ← ${httpRes.statusCode} ${request.url}',
+        metadata: {
+          'status': '${httpRes.statusCode}',
+          'elapsed_ms': '${stopwatch.elapsedMilliseconds}',
+          'body_size': '${response.data.length}',
+        });
 
     return response;
   }
@@ -235,4 +320,16 @@ class HttpNetworkClient implements NetworkClientProtocol {
 
   /// Closes the underlying [HttpClient].
   void close({bool force = false}) => _client.close(force: force);
+
+  bool _disposed = false;
+
+  /// Releases resources held by this client.
+  ///
+  /// Sets an internal disposed flag and closes the underlying [HttpClient]
+  /// forcefully. Safe to call multiple times — subsequent calls are no-ops.
+  void dispose() {
+    if (_disposed) return;
+    _disposed = true;
+    _client.close(force: true);
+  }
 }

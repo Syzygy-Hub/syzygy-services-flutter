@@ -15,7 +15,7 @@ abstract class ServicesAnalyticsProvider implements AnalyticsProvider {
 /// Suitable for debug builds. Replace with a real analytics SDK in
 /// production.
 class ConsoleAnalyticsProvider implements ServicesAnalyticsProvider {
-  final String _sessionId;
+  String _sessionId;
 
   /// Creates a [ConsoleAnalyticsProvider] with an auto-generated session ID.
   ConsoleAnalyticsProvider()
@@ -26,9 +26,14 @@ class ConsoleAnalyticsProvider implements ServicesAnalyticsProvider {
 
   @override
   void track(AnalyticsEvent event) {
+    final enriched = AnalyticsEvent(
+      name: event.name,
+      properties: {'session_id': _sessionId, ...event.properties},
+      timestamp: event.timestamp,
+    );
     // ignore: avoid_print
-    print('[Analytics] event=${event.name} props=${event.properties} '
-        'session=$_sessionId ts=${event.timestamp.millisecondsSinceEpoch}');
+    print('[Analytics] event=${enriched.name} props=${enriched.properties} '
+        'session=$_sessionId ts=${enriched.timestamp.millisecondsSinceEpoch}');
   }
 
   @override
@@ -39,8 +44,9 @@ class ConsoleAnalyticsProvider implements ServicesAnalyticsProvider {
 
   @override
   void reset() {
+    _sessionId = SyzygyID.generate<ConsoleAnalyticsProvider>().rawValue;
     // ignore: avoid_print
-    print('[Analytics] reset');
+    print('[Analytics] reset — new session=$_sessionId');
   }
 
   @override
@@ -56,7 +62,7 @@ class ConsoleAnalyticsProvider implements ServicesAnalyticsProvider {
 /// [ServicesAnalyticsProvider] that stores events in memory — useful for
 /// tests.
 class InMemoryAnalyticsProvider implements ServicesAnalyticsProvider {
-  final String _sessionId;
+  String _sessionId;
   final List<AnalyticsEvent> events = [];
   final Map<String, Map<String, Object?>> _userProperties = {};
   final List<String> screenViews = [];
@@ -68,18 +74,27 @@ class InMemoryAnalyticsProvider implements ServicesAnalyticsProvider {
   @override
   String get sessionId => _sessionId;
 
+  /// Tracks [event], injecting `session_id` into its properties.
   @override
-  void track(AnalyticsEvent event) => events.add(event);
+  void track(AnalyticsEvent event) {
+    events.add(AnalyticsEvent(
+      name: event.name,
+      properties: {'session_id': _sessionId, ...event.properties},
+      timestamp: event.timestamp,
+    ));
+  }
 
   @override
   void identify(String userId, Map<String, Object?> traits) =>
       _userProperties[userId] = Map.of(traits);
 
+  /// Clears all events/properties and generates a new session ID.
   @override
   void reset() {
     events.clear();
     _userProperties.clear();
     screenViews.clear();
+    _sessionId = SyzygyID.generate<InMemoryAnalyticsProvider>().rawValue;
   }
 
   @override
