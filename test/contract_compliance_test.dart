@@ -10,6 +10,7 @@
 /// These tests do NOT test behaviour in depth — see the per-module test files
 /// for behavioural coverage. The goal here is a fast, compile-time-verified
 /// smoke check that no service has drifted from its Foundation contract.
+library syzygy_services_flutter.test.contract_compliance;
 
 import 'dart:typed_data';
 

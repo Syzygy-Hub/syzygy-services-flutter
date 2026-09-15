@@ -180,7 +180,7 @@ void main() {
         maxRetries: 1,
         logger: logger,
       );
-      await client.execute(NetworkRequest(
+      await client.execute(const NetworkRequest(
         url: 'https://example.com/secure',
         method: NetworkMethod.get,
         headers: {'Authorization': 'Bearer secret-token', 'X-Custom': 'value'},

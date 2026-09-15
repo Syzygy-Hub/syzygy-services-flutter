@@ -17,7 +17,7 @@ void main() {
       // After disposal the underlying HttpClient is closed; any attempt to
       // open a new connection should throw a StateError or SocketException.
       expect(
-        () async => client.execute(NetworkRequest(
+        () async => client.execute(const NetworkRequest(
           url: 'http://127.0.0.1:19999/no-such-host',
           method: NetworkMethod.get,
           headers: {},
