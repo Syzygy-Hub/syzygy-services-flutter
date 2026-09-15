@@ -1,13 +1,8 @@
-[![CI](https://github.com/Syzygy-Hub/syzygy-services-flutter/actions/workflows/ci.yml/badge.svg)](https://github.com/Syzygy-Hub/syzygy-services-flutter/actions/workflows/ci.yml)
-[![Version](https://img.shields.io/badge/version-1.0.0-blue)](https://github.com/Syzygy-Hub/syzygy-services-flutter/releases/tag/1.0.0)
-[![Flutter](https://img.shields.io/badge/Flutter-3.0%2B-02569B?logo=flutter)](https://flutter.dev)
-[![Dart](https://img.shields.io/badge/Dart-%3E%3D3.0-0175C2?logo=dart)](https://dart.dev)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![Flutter](https://img.shields.io/badge/Flutter-Dart-02569B?style=flat&logo=flutter&logoColor=white)](https://flutter.dev) [![Dart](https://img.shields.io/badge/Dart-%3E%3D3.0-0175C2?style=flat&logo=dart&logoColor=white)](https://dart.dev) [![CI](https://img.shields.io/github/actions/workflow/status/Syzygy-Hub/syzygy-services-flutter/ci.yml?label=ci&style=flat)](https://github.com/Syzygy-Hub/syzygy-services-flutter/actions/workflows/ci.yml) [![Version](https://img.shields.io/badge/version-1.1.0-D85A30?style=flat)](https://github.com/Syzygy-Hub/syzygy-services-flutter/releases) [![License](https://img.shields.io/badge/License-MIT-green?style=flat)](LICENSE)
 
 <picture>
-  <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/Syzygy-Hub/.github/main/assets/syzygy-banner-dark.png">
-  <source media="(prefers-color-scheme: light)" srcset="https://raw.githubusercontent.com/Syzygy-Hub/.github/main/assets/syzygy-banner-light.png">
-  <img alt="Syzygy" src="https://raw.githubusercontent.com/Syzygy-Hub/.github/main/assets/syzygy-banner-light.png">
+  <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/Syzygy-Hub/.github/main/brand/assets/banners/syzygy-banner-dark-1200.png">
+  <img src="https://raw.githubusercontent.com/Syzygy-Hub/.github/main/brand/assets/banners/syzygy-banner-light-1200.png" alt="Syzygy" width="600">
 </picture>
 
 # syzygy-services-flutter
@@ -18,22 +13,22 @@ Concrete I/O service implementations for the Syzygy Flutter ecosystem — networ
 
 | Module | Abstract Class | Concrete Implementation | Description |
 |--------|---------------|------------------------|-------------|
-| `networking` | `NetworkClient` | `HttpNetworkClient` | HTTP GET/POST via dart:io HttpClient |
+| `networking` | `NetworkClientProtocol` | `HttpNetworkClient` | HTTP GET/POST via dart:io HttpClient |
 | `persistence` | `StorageProvider` | `InMemoryStorageProvider` | Key-value storage (SharedPreferences-ready) |
-| `auth` | `AuthProvider` | `JWTAuthProvider` | JWT token storage and refresh stub |
-| `filemanagement` | `FileProvider` | `DartFileProvider` | File I/O via dart:io |
-| `pushnotifications` | `PushProvider` | `InMemoryPushProvider` | Push token registration stub |
-| `deviceservices` | `DeviceProvider` | `PlatformDeviceProvider` | OS name and version via Platform |
-| `remoteconfig` | `RemoteConfigProvider` | `InMemoryRemoteConfigProvider` | In-memory remote config store |
+| `auth` | `AuthProvider` | `TokenAuthProvider` | JWT token storage and refresh |
+| `filemanagement` | `FileProvider` | `IoFileProvider` | File I/O via dart:io |
+| `pushnotifications` | `PushProvider` | `InMemoryPushProvider` | Push token registration |
+| `deviceservices` | `DeviceProvider` | `IoDeviceProvider` | OS name and version via Platform |
+| `remoteconfig` | `RemoteConfigProvider` | `NetworkRemoteConfigProvider` | Networked remote configuration with cache TTL |
 | `analytics` | `AnalyticsProvider` | `ConsoleAnalyticsProvider` | Console analytics event logging |
-| `crashreporting` | `CrashReporter` | `ConsoleCrashReporter` | Console crash and error logging |
+| `crashreporting` | `CrashReporter` | `InMemoryCrashReporter` | In-memory breadcrumb buffer with crash recording |
 | `websocket` | `WebSocketProvider` | `DartWebSocketProvider` | WebSocket via dart:io |
 
 ## Installation
 
 ```yaml
 dependencies:
-  syzygy_services_flutter: ^1.0.0
+  syzygy_services_flutter: ^1.1.0
 ```
 
 ## Requirements
@@ -54,6 +49,76 @@ dependencies:
 | [syzygy-foundation-flutter](https://github.com/Syzygy-Hub/syzygy-foundation-flutter) | Foundation | Primitives, extensions, and base utilities |
 | **syzygy-services-flutter** | **Services** | **Concrete I/O service implementations** |
 | [syzygy-core-flutter](https://github.com/Syzygy-Hub/syzygy-core-flutter) | Core | Business logic and domain layer |
+
+## Push Notifications
+
+`PushProvider` abstracts FCM (Android + iOS) and APNs (iOS) push-notification delivery behind a platform-agnostic interface.
+
+### FCM Integration (Android + iOS)
+
+```dart
+// 1. Obtain the FCM token and register it with your backend.
+final token = await FirebaseMessaging.instance.getToken();
+if (token != null) myPushProvider.registerToken(token);
+
+// 2. Handle foreground messages.
+FirebaseMessaging.onMessage.listen((RemoteMessage message) {
+  myPushProvider.handleNotification(NotificationPayload(
+    title: message.notification?.title ?? '',
+    body:  message.notification?.body  ?? '',
+    data:  message.data,
+  ));
+});
+```
+
+### APNs Integration (iOS)
+
+```dart
+// Retrieve the raw APNs token when not using FCM as the bridge.
+final apnsToken = await FirebaseMessaging.instance.getAPNSToken();
+if (apnsToken != null) myPushProvider.registerToken(apnsToken);
+```
+
+Enable **Push Notifications** in the Xcode capability pane and ensure
+`GoogleService-Info.plist` is present in the iOS Runner directory.
+
+### Factory Helpers
+
+`NotificationPayload` provides named constructors for common notification types:
+
+```dart
+// Alert — no extra data.
+final alert = NotificationPayload.alert(title: 'Hi', body: 'You have mail');
+
+// Deep-link — stores the route under the "route" key.
+final nav = NotificationPayload.deepLink(
+  title: 'Open inbox',
+  body: 'Tap to view',
+  route: '/inbox',
+);
+
+// Silent — no visible alert, useful for background refresh.
+final silent = NotificationPayload.silent({'refresh': 'true'});
+
+// Badge — updates the app-icon badge count.
+final badge = NotificationPayload.badge(title: '', body: '', badgeCount: 5);
+```
+
+### Testing
+
+Use `InMemoryPushProvider` in unit and widget tests:
+
+```dart
+final push = InMemoryPushProvider();
+await push.requestPermission(); // returns true immediately
+push.registerToken('test-token');
+
+push.onNotification.listen((payload) {
+  // handle payload in test
+});
+
+push.handleNotification(NotificationPayload.alert(title: 'Test', body: 'body'));
+```
 
 ## License
 

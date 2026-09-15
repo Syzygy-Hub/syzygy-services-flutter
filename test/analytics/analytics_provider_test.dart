@@ -13,9 +13,8 @@ void main() {
     });
 
     test('track stores the event', () {
-      final event = AnalyticsEvent(name: 'button_tapped');
-      analytics.track(event);
-      expect(analytics.events, contains(event));
+      analytics.track(AnalyticsEvent(name: 'button_tapped'));
+      expect(analytics.events.any((e) => e.name == 'button_tapped'), isTrue);
     });
 
     test('identify stores user properties', () {
@@ -43,6 +42,37 @@ void main() {
       analytics.track(AnalyticsEvent(name: 'a'));
       analytics.track(AnalyticsEvent(name: 'b'));
       expect(analytics.events.map((e) => e.name).toList(), ['a', 'b']);
+    });
+
+    test('session_id is injected into every tracked event properties', () {
+      analytics.track(AnalyticsEvent(name: 'purchase'));
+      final event = analytics.events.first;
+      expect(event.properties['session_id'], analytics.sessionId);
+    });
+
+    test('session_id matches sessionId across multiple events', () {
+      analytics.track(AnalyticsEvent(name: 'ev1'));
+      analytics.track(AnalyticsEvent(name: 'ev2'));
+      for (final e in analytics.events) {
+        expect(e.properties['session_id'], analytics.sessionId);
+      }
+    });
+
+    test('session_id changes after reset()', () {
+      final idBefore = analytics.sessionId;
+      analytics.reset();
+      expect(analytics.sessionId, isNot(idBefore));
+    });
+
+    test('events after reset() carry the new session_id', () {
+      analytics.track(AnalyticsEvent(name: 'before'));
+      final oldId = analytics.sessionId;
+      analytics.reset();
+      analytics.track(AnalyticsEvent(name: 'after'));
+      expect(analytics.events.first.properties['session_id'],
+          isNot(oldId));
+      expect(analytics.events.first.properties['session_id'],
+          analytics.sessionId);
     });
   });
 }

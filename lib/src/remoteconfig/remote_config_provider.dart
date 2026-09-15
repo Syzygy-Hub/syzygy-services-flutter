@@ -1,4 +1,8 @@
+import 'dart:convert';
+
 import 'package:syzygy_foundation_flutter/syzygy_foundation_flutter.dart';
+
+import '../networking/network_client.dart';
 
 /// Abstract contract for remote configuration.
 ///
@@ -77,6 +81,97 @@ class InMemoryRemoteConfigProvider implements RemoteConfigProvider {
       ..addAll(_defaults)
       ..addAll(_remote);
     _lastFetchTime = SyzygyTimestamp.now();
+  }
+
+  @override
+  SyzygyTimestamp? get lastFetchTime => _lastFetchTime;
+}
+
+/// [RemoteConfigProvider] backed by a real HTTP endpoint with cache TTL.
+///
+/// [fetch] hits [configUrl] only when the cache is empty or stale (older than
+/// [cacheTtlSeconds] seconds). Successful responses are merged on top of
+/// [defaults] and cached until the TTL expires.
+///
+/// The endpoint must return a JSON object whose top-level keys become config
+/// values.
+class NetworkRemoteConfigProvider implements RemoteConfigProvider {
+  final HttpNetworkClient _client;
+
+  /// URL that returns a JSON object of key→value pairs.
+  final String configUrl;
+
+  /// Number of seconds a successful fetch is considered fresh.
+  /// Defaults to 3600 (1 hour).
+  final int cacheTtlSeconds;
+
+  final Map<String, Object?> _defaults;
+  final Map<String, Object?> _store = {};
+  SyzygyTimestamp? _lastFetchTime;
+
+  /// Creates a [NetworkRemoteConfigProvider].
+  ///
+  /// [client] is the HTTP client used to fetch remote config.
+  /// [configUrl] is the endpoint returning a JSON config object.
+  /// [cacheTtlSeconds] controls how long a cached result is reused (default 3600).
+  /// [defaults] provide fallback values used before and between fetches.
+  NetworkRemoteConfigProvider({
+    required HttpNetworkClient client,
+    required this.configUrl,
+    this.cacheTtlSeconds = 3600,
+    Map<String, Object?> defaults = const {},
+  })  : _client = client,
+        _defaults = Map.of(defaults) {
+    _store.addAll(_defaults);
+  }
+
+  bool get _isCacheStale {
+    final last = _lastFetchTime;
+    if (last == null) return true;
+    final age = DateTime.now()
+        .difference(last.toDateTime())
+        .inSeconds;
+    return age >= cacheTtlSeconds;
+  }
+
+  @override
+  T? getValue<T>(String key) {
+    final v = _store[key];
+    if (v is T) return v;
+    return null;
+  }
+
+  @override
+  String? getString(String key) => getValue<String>(key);
+
+  @override
+  int? getInt(String key) => getValue<int>(key);
+
+  @override
+  bool? getBool(String key) => getValue<bool>(key);
+
+  @override
+  double? getDouble(String key) => getValue<double>(key);
+
+  /// Fetches remote config from [configUrl] if the cache is stale or empty.
+  ///
+  /// Returns immediately without hitting the network when the cache is still
+  /// fresh (within [cacheTtlSeconds]).
+  @override
+  Future<void> fetch() async {
+    if (!_isCacheStale) return;
+
+    final response = await _client.get(configUrl);
+
+    if (!response.isSuccess) return;
+
+    final body = jsonDecode(utf8.decode(response.data));
+    if (body is Map<String, dynamic>) {
+      _store
+        ..addAll(_defaults)
+        ..addAll(body);
+      _lastFetchTime = SyzygyTimestamp.now();
+    }
   }
 
   @override

@@ -1,3 +1,4 @@
+import 'package:syzygy_foundation_flutter/syzygy_foundation_flutter.dart';
 import 'package:syzygy_services_flutter/syzygy_services_flutter.dart';
 import 'package:test/test.dart';
 
@@ -42,6 +43,18 @@ void main() {
       // Create a new provider backed by the same storage.
       final device2 = IoDeviceProvider(storage);
       expect(device2.deviceId, id1);
+    });
+
+    test('UUID consistent across multiple calls on the same instance', () {
+      final ids = List.generate(5, (_) => device.deviceId);
+      expect(ids.toSet().length, 1);
+    });
+
+    test('UUID persists across re-instantiation using syzygy.device.uuid key', () {
+      const key = StorageKey<String>('syzygy.device.uuid');
+      final id = device.deviceId;
+      // The value must be stored under the documented key.
+      expect(storage.get<String>(key), id);
     });
   });
 }

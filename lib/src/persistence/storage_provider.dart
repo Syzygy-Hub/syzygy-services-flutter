@@ -18,13 +18,16 @@ class InMemoryStorageProvider implements StorageProvider {
   /// Retrieves a value for [key], returning [StorageKey.defaultValue] when
   /// the key is absent.
   ///
-  /// Returns `null` when the stored type does not match [T].
+  /// Throws [StateError] when the stored value exists but cannot be cast to [T].
   @override
   T? get<T>(StorageKey<T> key) {
     final raw = _store[_resolveKey(key)];
     if (raw == null) return key.defaultValue;
     if (raw is T) return raw as T;
-    return key.defaultValue;
+    throw StateError(
+      "StorageProvider: value for key '${key.identifier}' has type "
+      "'${raw.runtimeType}' but '$T' was requested.",
+    );
   }
 
   /// Stores [value] under [key].
@@ -49,11 +52,16 @@ class InMemoryStorageProvider implements StorageProvider {
   }
 
   /// Retrieves a value from the secure namespace.
+  ///
+  /// Throws [StateError] when the stored value exists but cannot be cast to [T].
   T? getSecure<T>(StorageKey<T> key) {
     final raw = _store[_resolveKey(key, secure: true)];
     if (raw == null) return key.defaultValue;
     if (raw is T) return raw as T;
-    return key.defaultValue;
+    throw StateError(
+      "StorageProvider: value for secure key '${key.identifier}' has type "
+      "'${raw.runtimeType}' but '$T' was requested.",
+    );
   }
 
   /// Removes a value from the secure namespace.

@@ -4,7 +4,7 @@ import 'package:syzygy_foundation_flutter/syzygy_foundation_flutter.dart';
 
 import '../persistence/storage_provider.dart';
 
-const _deviceIdKey = StorageKey<String>('device.id');
+const _deviceIdKey = StorageKey<String>('syzygy.device.uuid');
 
 /// Abstract contract for accessing device-level metadata.
 abstract class DeviceProvider {

@@ -45,5 +45,29 @@ void main() {
       expect(storage.get<String>(stringKey), 'regular');
       expect(storage.getSecure<String>(stringKey), 'secure');
     });
+
+    test('get throws StateError on type mismatch with descriptive message', () {
+      // Store a String but request an int — should throw.
+      storage.set<String>('not-an-int', stringKey);
+      expect(
+        () => storage.get<int>(StorageKey<int>(stringKey.identifier)),
+        throwsA(
+          isA<StateError>().having(
+            (e) => e.message,
+            'message',
+            allOf(
+              contains(stringKey.identifier),
+              contains('String'),
+              contains('int'),
+            ),
+          ),
+        ),
+      );
+    });
+
+    test('get returns value when type matches', () {
+      storage.set<String>('hello', stringKey);
+      expect(storage.get<String>(stringKey), 'hello');
+    });
   });
 }
