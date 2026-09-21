@@ -229,8 +229,7 @@ void main() {
       final fakeHttp =
           _FakeHttpClient(statusCode: 200, body: utf8.encode('{}'));
       final client = HttpNetworkClient(client: fakeHttp);
-      final res =
-          await client.post('https://example.com', body: {'x': 1});
+      final res = await client.post('https://example.com', body: {'x': 1});
       expect(res.isSuccess, isTrue);
     });
   });

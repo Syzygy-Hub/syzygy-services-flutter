@@ -37,8 +37,14 @@ void main() {
       await Future<void>.delayed(Duration.zero);
       await sub.cancel();
 
-      expect(received.any((e) => e is List && e.length == 3 &&
-          e[0] == 1 && e[1] == 2 && e[2] == 3), isTrue);
+      expect(
+          received.any((e) =>
+              e is List &&
+              e.length == 3 &&
+              e[0] == 1 &&
+              e[1] == 2 &&
+              e[2] == 3),
+          isTrue);
     });
 
     test('sendText throws StateError when not connected', () async {

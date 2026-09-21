@@ -1,9 +1,35 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'dart:math';
 import 'dart:typed_data';
 
 import 'package:syzygy_foundation_flutter/syzygy_foundation_flutter.dart';
+
+// ---------------------------------------------------------------------------
+// Canonical backoff policy (all 4 platforms must match).
+// delay = random(0, min(cap, base * multiplier^attempt))
+// ---------------------------------------------------------------------------
+
+/// Base delay in milliseconds for exponential backoff.
+const int kBackoffBaseMs = 500;
+
+/// Multiplier applied per retry attempt.
+const double kBackoffMultiplier = 2.0;
+
+/// Maximum delay cap in milliseconds.
+const int kBackoffCapMs = 8000;
+
+/// Maximum number of retry attempts.
+const int kMaxRetryAttempts = 3;
+
+/// Computes a jittered backoff delay for [attempt] (0-based).
+Duration backoffDelay(int attempt) {
+  final cap = kBackoffCapMs.toDouble();
+  final ceiling = min(cap, kBackoffBaseMs * pow(kBackoffMultiplier, attempt));
+  final ms = (Random().nextDouble() * ceiling).round();
+  return Duration(milliseconds: ms);
+}
 
 /// Error raised when an HTTP operation fails.
 class NetworkError implements SyzygyError {
@@ -136,7 +162,7 @@ class HttpNetworkClient implements NetworkClientProtocol {
       if (attempt >= maxRetries - 1) rethrow;
       if (e.code == SyzygyErrorCode.timeout ||
           e.code == SyzygyErrorCode.networkUnavailable) {
-        final delay = Duration(milliseconds: 200 * (1 << attempt));
+        final delay = backoffDelay(attempt);
         await backoffClock(delay);
         return _executeWithRetry(request, attempt + 1);
       }
@@ -148,11 +174,13 @@ class HttpNetworkClient implements NetworkClientProtocol {
     final uri = Uri.parse(request.url);
     final method = request.method.value;
 
-    // Log the outgoing request, omitting the Authorization header.
+    // Log the outgoing request, redacting sensitive headers.
     if (logger != null) {
-      final safeHeaders = Map<String, String>.from(request.headers)
-        ..remove('Authorization')
-        ..remove('authorization');
+      final safeHeaders = Map<String, String>.fromEntries(
+        request.headers.entries.where(
+          (e) => !_redactedHeaders.contains(e.key.toLowerCase()),
+        ),
+      );
       logger!.info('NetworkClient → $method ${request.url}', metadata: {
         'headers': safeHeaders.toString(),
         'body_size': '${request.body?.length ?? 0}',
@@ -163,9 +191,8 @@ class HttpNetworkClient implements NetworkClientProtocol {
     late HttpClientRequest httpReq;
 
     try {
-      httpReq = await _client
-          .openUrl(method, uri)
-          .timeout(timeout, onTimeout: () => throw NetworkError(
+      httpReq = await _client.openUrl(method, uri).timeout(timeout,
+          onTimeout: () => throw NetworkError(
                 code: SyzygyErrorCode.timeout,
                 message: 'Request timed out: ${request.url}',
               ));
@@ -219,7 +246,8 @@ class HttpNetworkClient implements NetworkClientProtocol {
         code: SyzygyErrorCode.serverError,
         message: 'Server error ${httpRes.statusCode}',
       );
-      logger?.error('NetworkClient ← ERROR ${request.url}', error: error,
+      logger?.error('NetworkClient ← ERROR ${request.url}',
+          error: error,
           metadata: {
             'status': '${httpRes.statusCode}',
             'elapsed_ms': '${stopwatch.elapsedMilliseconds}',
@@ -227,8 +255,7 @@ class HttpNetworkClient implements NetworkClientProtocol {
       throw error;
     }
 
-    logger?.info(
-        'NetworkClient ← ${httpRes.statusCode} ${request.url}',
+    logger?.info('NetworkClient ← ${httpRes.statusCode} ${request.url}',
         metadata: {
           'status': '${httpRes.statusCode}',
           'elapsed_ms': '${stopwatch.elapsedMilliseconds}',
@@ -259,7 +286,8 @@ class HttpNetworkClient implements NetworkClientProtocol {
       ));
 
   /// Convenience: perform a POST request with an optional JSON [body].
-  Future<NetworkResponse> post(String url, {
+  Future<NetworkResponse> post(
+    String url, {
     Object? body,
     Map<String, String>? headers,
   }) {
@@ -276,7 +304,8 @@ class HttpNetworkClient implements NetworkClientProtocol {
   }
 
   /// Convenience: perform a PUT request.
-  Future<NetworkResponse> put(String url, {
+  Future<NetworkResponse> put(
+    String url, {
     Object? body,
     Map<String, String>? headers,
   }) {
@@ -293,8 +322,7 @@ class HttpNetworkClient implements NetworkClientProtocol {
   }
 
   /// Convenience: perform a DELETE request.
-  Future<NetworkResponse> delete(String url,
-          {Map<String, String>? headers}) =>
+  Future<NetworkResponse> delete(String url, {Map<String, String>? headers}) =>
       execute(NetworkRequest(
         url: url,
         method: NetworkMethod.delete,
@@ -302,7 +330,8 @@ class HttpNetworkClient implements NetworkClientProtocol {
       ));
 
   /// Convenience: perform a PATCH request.
-  Future<NetworkResponse> patch(String url, {
+  Future<NetworkResponse> patch(
+    String url, {
     Object? body,
     Map<String, String>? headers,
   }) {
@@ -317,6 +346,14 @@ class HttpNetworkClient implements NetworkClientProtocol {
       body: encoded != null ? Uint8List.fromList(encoded) : null,
     ));
   }
+
+  /// Headers whose values must never appear in logs. All entries are lowercase.
+  static const _redactedHeaders = {
+    'authorization',
+    'cookie',
+    'x-api-key',
+    'proxy-authorization',
+  };
 
   /// Closes the underlying [HttpClient].
   void close({bool force = false}) => _client.close(force: force);

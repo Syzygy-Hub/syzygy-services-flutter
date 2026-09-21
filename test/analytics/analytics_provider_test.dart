@@ -3,6 +3,24 @@ import 'package:syzygy_services_flutter/syzygy_services_flutter.dart';
 import 'package:test/test.dart';
 
 void main() {
+  // HI-06: PII redaction test for ConsoleAnalyticsProvider
+  group('ConsoleAnalyticsProvider — HI-06 redaction', () {
+    test('identify does not log userId or email in plain text', () {
+      final captured = <String>[];
+      final provider =
+          ConsoleAnalyticsProvider(logger: (msg) => captured.add(msg));
+
+      provider.identify(
+          'test@example.com', {'email': 'test@example.com', 'plan': 'pro'});
+
+      final output = captured.join();
+      expect(output, isNot(contains('test@example.com')),
+          reason: 'Plain-text PII must not appear in log output');
+      expect(output, contains('<redacted>'),
+          reason: 'Redaction sentinel must appear in log output');
+    });
+  });
+
   late InMemoryAnalyticsProvider analytics;
 
   setUp(() => analytics = InMemoryAnalyticsProvider());
@@ -69,10 +87,9 @@ void main() {
       final oldId = analytics.sessionId;
       analytics.reset();
       analytics.track(AnalyticsEvent(name: 'after'));
-      expect(analytics.events.first.properties['session_id'],
-          isNot(oldId));
-      expect(analytics.events.first.properties['session_id'],
-          analytics.sessionId);
+      expect(analytics.events.first.properties['session_id'], isNot(oldId));
+      expect(
+          analytics.events.first.properties['session_id'], analytics.sessionId);
     });
   });
 }

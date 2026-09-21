@@ -109,28 +109,32 @@ class NetworkRemoteConfigProvider implements RemoteConfigProvider {
   final Map<String, Object?> _store = {};
   SyzygyTimestamp? _lastFetchTime;
 
+  /// Optional logger. When non-null, fetch failures and recoveries are logged.
+  final LoggerProtocol? _logger;
+
   /// Creates a [NetworkRemoteConfigProvider].
   ///
   /// [client] is the HTTP client used to fetch remote config.
   /// [configUrl] is the endpoint returning a JSON config object.
   /// [cacheTtlSeconds] controls how long a cached result is reused (default 3600).
   /// [defaults] provide fallback values used before and between fetches.
+  /// [logger] receives warnings on fetch failure and info on recovery.
   NetworkRemoteConfigProvider({
     required HttpNetworkClient client,
     required this.configUrl,
     this.cacheTtlSeconds = 3600,
     Map<String, Object?> defaults = const {},
+    LoggerProtocol? logger,
   })  : _client = client,
-        _defaults = Map.of(defaults) {
+        _defaults = Map.of(defaults),
+        _logger = logger {
     _store.addAll(_defaults);
   }
 
   bool get _isCacheStale {
     final last = _lastFetchTime;
     if (last == null) return true;
-    final age = DateTime.now()
-        .difference(last.toDateTime())
-        .inSeconds;
+    final age = DateTime.now().difference(last.toDateTime()).inSeconds;
     return age >= cacheTtlSeconds;
   }
 
@@ -161,16 +165,29 @@ class NetworkRemoteConfigProvider implements RemoteConfigProvider {
   Future<void> fetch() async {
     if (!_isCacheStale) return;
 
-    final response = await _client.get(configUrl);
+    try {
+      final response = await _client.get(configUrl);
 
-    if (!response.isSuccess) return;
+      if (!response.isSuccess) {
+        _logger?.warning(
+          'RemoteConfigProvider: fetch failed — HTTP ${response.statusCode}',
+        );
+        return;
+      }
 
-    final body = jsonDecode(utf8.decode(response.data));
-    if (body is Map<String, dynamic>) {
-      _store
-        ..addAll(_defaults)
-        ..addAll(body);
-      _lastFetchTime = SyzygyTimestamp.now();
+      final body = jsonDecode(utf8.decode(response.data));
+      if (body is Map<String, dynamic>) {
+        _store
+          ..addAll(_defaults)
+          ..addAll(body);
+        final wasStale = _lastFetchTime == null;
+        _lastFetchTime = SyzygyTimestamp.now();
+        if (!wasStale) {
+          _logger?.info('RemoteConfigProvider: fetch recovered');
+        }
+      }
+    } catch (e) {
+      _logger?.warning('RemoteConfigProvider: fetch failed — $e');
     }
   }
 

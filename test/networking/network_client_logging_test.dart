@@ -149,8 +149,8 @@ void main() {
         maxRetries: 1,
         // logger is null by default
       );
-      await client.execute(
-          const NetworkRequest(url: 'https://x.com', method: NetworkMethod.get));
+      await client.execute(const NetworkRequest(
+          url: 'https://x.com', method: NetworkMethod.get));
       // Test simply verifies there is no exception and we can construct without logger.
     });
 
@@ -167,10 +167,16 @@ void main() {
 
       final messages = logger.entries.map((e) => e.message).toList();
       // Expect a request log and a response log.
-      expect(messages.any((m) => m.contains('GET') && m.contains('https://example.com/api')),
-          isTrue, reason: 'request should be logged');
-      expect(messages.any((m) => m.contains('200') && m.contains('https://example.com/api')),
-          isTrue, reason: 'response should be logged');
+      expect(
+          messages.any((m) =>
+              m.contains('GET') && m.contains('https://example.com/api')),
+          isTrue,
+          reason: 'request should be logged');
+      expect(
+          messages.any((m) =>
+              m.contains('200') && m.contains('https://example.com/api')),
+          isTrue,
+          reason: 'response should be logged');
     });
 
     test('Authorization header is excluded from request log', () async {
@@ -186,9 +192,8 @@ void main() {
         headers: {'Authorization': 'Bearer secret-token', 'X-Custom': 'value'},
       ));
 
-      final requestLogs = logger.entries
-          .where((e) => e.message.contains('GET'))
-          .toList();
+      final requestLogs =
+          logger.entries.where((e) => e.message.contains('GET')).toList();
       expect(requestLogs, isNotEmpty);
       for (final entry in requestLogs) {
         // Neither the message nor metadata should expose the Authorization value.
@@ -216,6 +221,75 @@ void main() {
           reason: 'an error-level log entry should be emitted on 5xx');
     });
 
+    // HI-07: case-insensitive header redaction
+    test('lowercase authorization header value is redacted from log', () async {
+      final logger = _RecordingLogger();
+      final client = HttpNetworkClient(
+        client: _FakeHttpClient(statusCode: 200, body: []),
+        maxRetries: 1,
+        logger: logger,
+      );
+      await client.execute(const NetworkRequest(
+        url: 'https://example.com/api',
+        method: NetworkMethod.get,
+        headers: {'authorization': 'Bearer lowercase-secret'},
+      ));
+      final allText =
+          logger.entries.map((e) => '${e.message} ${e.metadata}').join(' ');
+      expect(allText, isNot(contains('lowercase-secret')));
+    });
+
+    test('cookie header value is redacted from log', () async {
+      final logger = _RecordingLogger();
+      final client = HttpNetworkClient(
+        client: _FakeHttpClient(statusCode: 200, body: []),
+        maxRetries: 1,
+        logger: logger,
+      );
+      await client.execute(const NetworkRequest(
+        url: 'https://example.com/api',
+        method: NetworkMethod.get,
+        headers: {'cookie': 'session=abc123'},
+      ));
+      final allText =
+          logger.entries.map((e) => '${e.message} ${e.metadata}').join(' ');
+      expect(allText, isNot(contains('abc123')));
+    });
+
+    test('x-api-key header value is redacted from log', () async {
+      final logger = _RecordingLogger();
+      final client = HttpNetworkClient(
+        client: _FakeHttpClient(statusCode: 200, body: []),
+        maxRetries: 1,
+        logger: logger,
+      );
+      await client.execute(const NetworkRequest(
+        url: 'https://example.com/api',
+        method: NetworkMethod.get,
+        headers: {'x-api-key': 'my-secret-key'},
+      ));
+      final allText =
+          logger.entries.map((e) => '${e.message} ${e.metadata}').join(' ');
+      expect(allText, isNot(contains('my-secret-key')));
+    });
+
+    test('X-Custom-Header value is NOT redacted from log', () async {
+      final logger = _RecordingLogger();
+      final client = HttpNetworkClient(
+        client: _FakeHttpClient(statusCode: 200, body: []),
+        maxRetries: 1,
+        logger: logger,
+      );
+      await client.execute(const NetworkRequest(
+        url: 'https://example.com/api',
+        method: NetworkMethod.get,
+        headers: {'X-Custom-Header': 'visible-value'},
+      ));
+      final allText =
+          logger.entries.map((e) => '${e.message} ${e.metadata}').join(' ');
+      expect(allText, contains('visible-value'));
+    });
+
     test('body_size metadata is present in response log', () async {
       final logger = _RecordingLogger();
       final client = HttpNetworkClient(
@@ -226,9 +300,8 @@ void main() {
       await client.execute(const NetworkRequest(
           url: 'https://example.com', method: NetworkMethod.get));
 
-      final responseLogs = logger.entries
-          .where((e) => e.message.contains('200'))
-          .toList();
+      final responseLogs =
+          logger.entries.where((e) => e.message.contains('200')).toList();
       expect(responseLogs, isNotEmpty);
       expect(responseLogs.first.metadata['body_size'], '3');
     });

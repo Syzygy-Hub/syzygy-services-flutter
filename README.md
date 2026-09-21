@@ -1,4 +1,4 @@
-[![Flutter](https://img.shields.io/badge/Flutter-Dart-02569B?style=flat&logo=flutter&logoColor=white)](https://flutter.dev) [![Dart](https://img.shields.io/badge/Dart-%3E%3D3.0-0175C2?style=flat&logo=dart&logoColor=white)](https://dart.dev) [![CI](https://img.shields.io/github/actions/workflow/status/Syzygy-Hub/syzygy-services-flutter/ci.yml?label=ci&style=flat)](https://github.com/Syzygy-Hub/syzygy-services-flutter/actions/workflows/ci.yml) [![Version](https://img.shields.io/badge/version-1.1.0-D85A30?style=flat)](https://github.com/Syzygy-Hub/syzygy-services-flutter/releases) [![License](https://img.shields.io/badge/License-MIT-green?style=flat)](LICENSE)
+[![Flutter](https://img.shields.io/badge/Flutter-Dart-02569B?style=flat&logo=flutter&logoColor=white)](https://flutter.dev) [![Dart](https://img.shields.io/badge/Dart-%3E%3D3.0-0175C2?style=flat&logo=dart&logoColor=white)](https://dart.dev) [![CI](https://img.shields.io/github/actions/workflow/status/Syzygy-Hub/syzygy-services-flutter/ci.yml?label=ci&style=flat)](https://github.com/Syzygy-Hub/syzygy-services-flutter/actions/workflows/ci.yml) [![Version](https://img.shields.io/badge/version-1.2.0-D85A30?style=flat)](https://github.com/Syzygy-Hub/syzygy-services-flutter/releases) [![License](https://img.shields.io/badge/License-MIT-green?style=flat)](LICENSE)
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/Syzygy-Hub/.github/main/brand/assets/banners/syzygy-banner-dark-1200.png">
@@ -28,7 +28,7 @@ Concrete I/O service implementations for the Syzygy Flutter ecosystem — networ
 
 ```yaml
 dependencies:
-  syzygy_services_flutter: ^1.1.0
+  syzygy_services_flutter: ^1.2.0
 ```
 
 ## Requirements
@@ -38,7 +38,7 @@ dependencies:
 
 ## Dependencies
 
-- [`syzygy_foundation_flutter`](https://pub.dev/packages/syzygy_foundation_flutter) `^1.1.0`
+- [`syzygy_foundation_flutter`](https://pub.dev/packages/syzygy_foundation_flutter) `^1.2.0`
 
 ## Ecosystem
 

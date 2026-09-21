@@ -2,6 +2,8 @@ import 'dart:async';
 import 'dart:io';
 import 'dart:typed_data';
 
+import '../networking/network_client.dart' show kMaxRetryAttempts, backoffDelay;
+
 /// Connection lifecycle states for a [WebSocketProvider].
 enum WebSocketConnectionState {
   /// No active connection and no reconnection in progress.
@@ -63,6 +65,7 @@ abstract class WebSocketProvider {
 /// reconnection and exponential backoff.
 class DartWebSocketProvider implements WebSocketProvider {
   WebSocket? _socket;
+  StreamSubscription<dynamic>? _subscription;
   StreamController<dynamic>? _messageController;
   StreamController<Uint8List>? _binaryController;
   WebSocketConnectionState _state = WebSocketConnectionState.disconnected;
@@ -70,7 +73,7 @@ class DartWebSocketProvider implements WebSocketProvider {
   int _retryCount = 0;
   bool _disposed = false;
 
-  static const int _maxRetries = 5;
+  static const int _maxRetries = kMaxRetryAttempts;
 
   @override
   WebSocketConnectionState get connectionState => _state;
@@ -107,7 +110,7 @@ class DartWebSocketProvider implements WebSocketProvider {
 
       _messageController ??= StreamController<dynamic>.broadcast();
       _binaryController ??= StreamController<Uint8List>.broadcast();
-      _socket!.listen(
+      _subscription = _socket!.listen(
         (event) {
           _messageController?.add(event);
           // Binary frames arrive as List<int>; forward them to binaryMessages.
@@ -133,10 +136,12 @@ class DartWebSocketProvider implements WebSocketProvider {
   }
 
   Future<void> _scheduleReconnect() async {
+    if (_disposed) return;
     if (_retryCount >= _maxRetries || _lastUrl == null) return;
-    final delay = Duration(milliseconds: 200 * (1 << _retryCount));
+    final delay = backoffDelay(_retryCount);
     _retryCount++;
     await Future<void>.delayed(delay);
+    if (_disposed) return;
     await _doConnect(_lastUrl!);
   }
 
@@ -160,6 +165,8 @@ class DartWebSocketProvider implements WebSocketProvider {
   Future<void> disconnect() async {
     _lastUrl = null;
     _state = WebSocketConnectionState.disconnected;
+    await _subscription?.cancel();
+    _subscription = null;
     await _socket?.close();
     _socket = null;
     await _messageController?.close();
@@ -174,6 +181,8 @@ class DartWebSocketProvider implements WebSocketProvider {
     _disposed = true;
     _lastUrl = null;
     _state = WebSocketConnectionState.disconnected;
+    _subscription?.cancel();
+    _subscription = null;
     _socket?.close();
     _socket = null;
     if (_messageController != null && !_messageController!.isClosed) {

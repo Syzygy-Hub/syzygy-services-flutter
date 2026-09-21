@@ -143,14 +143,12 @@ class _FakeHttpClient implements HttpClient {
 // ---------------------------------------------------------------------------
 
 // Valid (exp 2030): {"sub":"1","exp":1893456000}
-const _validJwt =
-    'eyJhbGciOiJIUzI1NiJ9'
+const _validJwt = 'eyJhbGciOiJIUzI1NiJ9'
     '.eyJzdWIiOiIxIiwiZXhwIjoxODkzNDU2MDAwfQ'
     '.signature';
 
 // Expired (exp 2000): {"sub":"1","exp":946684800}
-const _expiredJwt =
-    'eyJhbGciOiJIUzI1NiJ9'
+const _expiredJwt = 'eyJhbGciOiJIUzI1NiJ9'
     '.eyJzdWIiOiIxIiwiZXhwIjo5NDY2ODQ4MDB9'
     '.signature';
 
@@ -239,12 +237,14 @@ void main() {
       auth.authenticate(
           const AuthToken(accessToken: _validJwt, refreshToken: 'rt'));
 
-      await expectLater(auth.refresh(), throwsA(isA<TokenRefreshFailedError>()));
+      await expectLater(
+          auth.refresh(), throwsA(isA<TokenRefreshFailedError>()));
       expect(auth.state, isA<Unauthenticated>());
       auth.dispose();
     });
 
-    test('refresh without session throws NetworkUnavailableAuthError', () async {
+    test('refresh without session throws NetworkUnavailableAuthError',
+        () async {
       final auth = _authWithNetwork(
         status: 200,
         responseBody: {'accessToken': 'x'},
@@ -255,7 +255,8 @@ void main() {
       auth.dispose();
     });
 
-    test('executeWithAutoRefresh refreshes expired JWT automatically', () async {
+    test('executeWithAutoRefresh refreshes expired JWT automatically',
+        () async {
       const newToken = 'new.valid.token';
       final auth = _authWithNetwork(
         status: 200,

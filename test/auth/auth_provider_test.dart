@@ -5,15 +5,13 @@ import 'package:test/test.dart';
 // A JWT whose exp is in the year 2030 (unix 1893456000).
 // Header.Payload.Signature — only payload matters for expiry detection.
 // payload JSON: {"sub":"1","exp":1893456000}
-const _validJwt =
-    'eyJhbGciOiJIUzI1NiJ9'
+const _validJwt = 'eyJhbGciOiJIUzI1NiJ9'
     '.eyJzdWIiOiIxIiwiZXhwIjoxODkzNDU2MDAwfQ'
     '.signature';
 
 // A JWT whose exp is in 2000 (unix 946684800) — always expired.
 // payload JSON: {"sub":"1","exp":946684800}
-const _expiredJwt =
-    'eyJhbGciOiJIUzI1NiJ9'
+const _expiredJwt = 'eyJhbGciOiJIUzI1NiJ9'
     '.eyJzdWIiOiIxIiwiZXhwIjo5NDY2ODQ4MDB9'
     '.signature';
 
@@ -64,7 +62,7 @@ void main() {
     test('token is persisted to storage on authenticate', () {
       const key = StorageKey<String>('auth.accessToken');
       auth.authenticate(const AuthToken(accessToken: _validJwt));
-      expect(storage.getSecure<String>(key), _validJwt);
+      expect(storage.get<String>(key), _validJwt);
     });
 
     test('jwtIsExpired returns false for future exp', () {
@@ -80,7 +78,8 @@ void main() {
     });
 
     test('authenticateWithBiometric returns unauthenticated', () async {
-      final result = await auth.authenticateWithBiometric('Please authenticate');
+      final result =
+          await auth.authenticateWithBiometric('Please authenticate');
       expect(result, isA<Unauthenticated>());
     });
   });

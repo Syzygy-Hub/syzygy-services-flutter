@@ -4,7 +4,6 @@ import 'dart:convert';
 import 'package:syzygy_foundation_flutter/syzygy_foundation_flutter.dart';
 
 import '../networking/network_client.dart';
-import '../persistence/storage_provider.dart';
 
 // Storage keys used to persist tokens across restarts.
 const _accessTokenKey = StorageKey<String>('auth.accessToken');
@@ -40,7 +39,7 @@ bool jwtIsExpired(String token) {
 }
 
 /// Concrete implementation of Foundation's [AuthProvider] contract backed by
-/// [InMemoryStorageProvider].
+/// a [StorageProvider].
 ///
 /// Tokens are persisted via the storage layer so they survive provider
 /// reconstruction within a process.
@@ -53,7 +52,7 @@ bool jwtIsExpired(String token) {
 /// before issuing requests, or use [executeWithAutoRefresh] to have the provider
 /// detect an expired JWT and refresh transparently.
 class TokenAuthProvider implements AuthProvider {
-  final InMemoryStorageProvider _storage;
+  final StorageProvider _storage;
   final _controller = StreamController<AuthState>.broadcast();
   AuthState _state = const Unauthenticated();
 
@@ -64,7 +63,12 @@ class TokenAuthProvider implements AuthProvider {
   /// `{"accessToken": "<at>", "refreshToken": "<rt>"}`.
   final String? refreshEndpoint;
 
-  /// Creates a [TokenAuthProvider] backed by [storage].
+  /// Creates a [TokenAuthProvider].
+  ///
+  /// [storage] MUST be backed by a secure storage implementation
+  /// (e.g. flutter_secure_storage). Tokens stored in a non-secure
+  /// provider are accessible to other apps on rooted devices.
+  /// TODO(Foundation-v1.2.0): enforce SecureStorageProvider type.
   ///
   /// Supply [networkClient] and [refreshEndpoint] to enable real token refresh.
   TokenAuthProvider(
@@ -73,11 +77,11 @@ class TokenAuthProvider implements AuthProvider {
     this.refreshEndpoint,
   }) {
     // Restore state from storage.
-    final saved = _storage.getSecure<String>(_accessTokenKey);
+    final saved = _storage.get<String>(_accessTokenKey);
     if (saved != null) {
       final token = AuthToken(
           accessToken: saved,
-          refreshToken: _storage.getSecure<String>(_refreshTokenKey));
+          refreshToken: _storage.get<String>(_refreshTokenKey));
       _state = token.isExpired ? AuthExpired(token) : Authenticated(token);
     }
   }
@@ -90,9 +94,9 @@ class TokenAuthProvider implements AuthProvider {
 
   @override
   void authenticate(AuthToken token) {
-    _storage.setSecure<String>(token.accessToken, _accessTokenKey);
+    _storage.set<String>(token.accessToken, _accessTokenKey);
     if (token.refreshToken != null) {
-      _storage.setSecure<String>(token.refreshToken!, _refreshTokenKey);
+      _storage.set<String>(token.refreshToken!, _refreshTokenKey);
     }
     _setState(Authenticated(token));
   }
@@ -144,14 +148,15 @@ class TokenAuthProvider implements AuthProvider {
 
         if (newAccess == null || newAccess.isEmpty) {
           _clearAndSignOut();
-          throw const TokenRefreshFailedError('Missing accessToken in response');
+          throw const TokenRefreshFailedError(
+              'Missing accessToken in response');
         }
 
         final newToken =
             AuthToken(accessToken: newAccess, refreshToken: newRefresh);
-        _storage.setSecure<String>(newAccess, _accessTokenKey);
+        _storage.set<String>(newAccess, _accessTokenKey);
         if (newRefresh != null) {
-          _storage.setSecure<String>(newRefresh, _refreshTokenKey);
+          _storage.set<String>(newRefresh, _refreshTokenKey);
         }
         _setState(Authenticated(newToken));
         return newToken;
@@ -188,8 +193,8 @@ class TokenAuthProvider implements AuthProvider {
   }
 
   void _clearAndSignOut() {
-    _storage.removeSecure<String>(_accessTokenKey);
-    _storage.removeSecure<String>(_refreshTokenKey);
+    _storage.remove<String>(_accessTokenKey);
+    _storage.remove<String>(_refreshTokenKey);
     _setState(const Unauthenticated());
   }
 
@@ -239,4 +244,3 @@ class TokenRefreshFailedError implements Exception {
   @override
   String toString() => 'TokenRefreshFailedError: $reason';
 }
-

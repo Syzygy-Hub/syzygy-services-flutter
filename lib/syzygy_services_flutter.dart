@@ -3,7 +3,7 @@
 /// This library provides platform-level service implementations that fulfil
 /// Foundation contracts. Import this in your application layer; depend on
 /// the Foundation contracts in your domain layer.
-library syzygy_services_flutter;
+library;
 
 export 'src/networking/network_client.dart';
 export 'src/persistence/storage_provider.dart';
