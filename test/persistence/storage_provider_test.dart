@@ -69,5 +69,15 @@ void main() {
       storage.set<String>('hello', stringKey);
       expect(storage.get<String>(stringKey), 'hello');
     });
+
+    test('concurrent reads return consistent values', () async {
+      const key = StorageKey<String>('test.concurrent');
+      storage.set<String>('value', key);
+      final results = await Future.wait(
+        List<Future<String?>>.generate(
+            10, (_) async => storage.get<String>(key)),
+      );
+      expect(results, everyElement('value'));
+    });
   });
 }

@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.2.0] - 2026-09-19
+
+### Fixed
+- `WebSocketProvider`: `_scheduleReconnect()` guards `_disposed` flag before and after delay — no reconnect after disposal
+- `WebSocketProvider`: `StreamSubscription` stored and cancelled on disconnect/dispose — no more leaked subscriptions
+- Header redaction is now case-insensitive and covers `authorization`, `cookie`, `x-api-key`, `proxy-authorization`
+
+### Changed
+- `TokenAuthProvider` depends only on Foundation `StorageProvider` abstract type — concrete dependencies removed
+- `TokenAuthProvider` secure storage injection documented — caller must inject a secure-backed implementation
+- `RemoteConfigProvider`: logs warn on fetch failure, info on recovery
+- `flutter_lints` updated to ^6.0.0
+- `verbose()` dispatches as `debug` until Foundation adds `LogLevel.verbose` — documented in CHANGELOG
+- Canonical backoff policy: 500ms base, 2.0× multiplier, full jitter, 8 000ms cap, max 3 retries
+- Foundation dependency updated to ^1.2.0
+
 ## [1.1.0] - 2026-09-13
 
 ### Added
@@ -53,5 +69,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - CrashReporter abstract class and console crash logging stub
 - WebSocketProvider abstract class and dart:io WebSocket stub
 
-[1.1.0]: https://github.com/Syzygy-Hub/syzygy-services-flutter/releases/tag/1.1.0
+[Unreleased]: https://github.com/Syzygy-Hub/syzygy-services-flutter/compare/1.2.0...HEAD
+[1.2.0]: https://github.com/Syzygy-Hub/syzygy-services-flutter/compare/1.1.0...1.2.0
+[1.1.0]: https://github.com/Syzygy-Hub/syzygy-services-flutter/compare/1.0.0...1.1.0
 [1.0.0]: https://github.com/Syzygy-Hub/syzygy-services-flutter/releases/tag/1.0.0

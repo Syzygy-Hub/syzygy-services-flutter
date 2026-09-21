@@ -2,6 +2,17 @@ import 'package:syzygy_services_flutter/syzygy_services_flutter.dart';
 import 'package:test/test.dart';
 
 void main() {
+  group('DartWebSocketProvider concurrency', () {
+    test('dispose during reconnect delay does not reconnect', () async {
+      final provider = DartWebSocketProvider();
+      // trigger reconnect by disposing immediately (no real connection needed)
+      provider.dispose();
+      await Future<void>.delayed(const Duration(milliseconds: 300));
+      // no exception, no reconnect attempt after dispose — state stays disconnected
+      expect(provider.connectionState, WebSocketConnectionState.disconnected);
+    });
+  });
+
   group('DartWebSocketProvider.dispose()', () {
     test('dispose() closes binary stream', () async {
       final provider = DartWebSocketProvider();

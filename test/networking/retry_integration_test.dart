@@ -5,6 +5,8 @@ import 'package:syzygy_foundation_flutter/syzygy_foundation_flutter.dart';
 import 'package:syzygy_services_flutter/syzygy_services_flutter.dart';
 import 'package:test/test.dart';
 
+// kBackoffBaseMs is exported from syzygy_services_flutter via network_client.dart
+
 // ---------------------------------------------------------------------------
 // Helpers shared with network_client_test (duplicated to keep test isolation)
 // ---------------------------------------------------------------------------
@@ -149,7 +151,8 @@ class _CountingHttpClient implements HttpClient {
 
   @override
   Future<HttpClientRequest> openUrl(String method, Uri url) async {
-    final idx = callCount < _responses.length ? callCount : _responses.length - 1;
+    final idx =
+        callCount < _responses.length ? callCount : _responses.length - 1;
     callCount++;
     return _FakeHttpClientRequest(_responses[idx]);
   }
@@ -329,10 +332,13 @@ void main() {
   // Mirrors the Android NetworkClient clock-injection pattern.
   // --------------------------------------------------------------------------
 
-  group('HttpNetworkClient injectable BackoffClock — deterministic backoff', () {
+  group('HttpNetworkClient injectable BackoffClock — deterministic backoff',
+      () {
     const url = 'https://example.com/api';
 
-    test('exact backoff durations: 200ms, 400ms for maxRetries=3', () async {
+    test(
+        'canonical backoff policy: attempt 0 in [0,500ms], attempt 1 in [0,1000ms]',
+        () async {
       final recorder = RecordingBackoffClock();
 
       final client = HttpNetworkClient(
@@ -350,12 +356,14 @@ void main() {
         throwsA(isA<NetworkError>()),
       );
 
-      // attempt 0 → delay 200*(1<<0)=200ms
-      // attempt 1 → delay 200*(1<<1)=400ms
+      // attempt 0 → jitter in [0, min(8000, 500*2^0)] = [0, 500]
+      // attempt 1 → jitter in [0, min(8000, 500*2^1)] = [0, 1000]
       // attempt 2 → exhausted, throws (no third delay)
       expect(recorder.durations, hasLength(2));
-      expect(recorder.durations[0], equals(const Duration(milliseconds: 200)));
-      expect(recorder.durations[1], equals(const Duration(milliseconds: 400)));
+      expect(recorder.durations[0].inMilliseconds,
+          inInclusiveRange(0, kBackoffBaseMs));
+      expect(recorder.durations[1].inMilliseconds,
+          inInclusiveRange(0, kBackoffBaseMs * 2));
     });
 
     test('no delay fired when maxRetries=1 (single attempt)', () async {
@@ -402,7 +410,8 @@ void main() {
       expect(recorder.durations, hasLength(retries - 1));
     });
 
-    test('delays are strictly increasing (exponential growth)', () async {
+    test('canonical backoff bounds: attempt N in [0, min(cap, base*2^N)]',
+        () async {
       final recorder = RecordingBackoffClock();
 
       final client = HttpNetworkClient(
@@ -420,12 +429,13 @@ void main() {
         throwsA(isA<NetworkError>()),
       );
 
-      for (var i = 1; i < recorder.durations.length; i++) {
+      // 4 delays for maxRetries=5 (attempts 0..3 each get a delay before next attempt)
+      expect(recorder.durations, hasLength(4));
+      final caps = [500, 1000, 2000, 4000]; // min(8000, 500*2^n) for n=0..3
+      for (var i = 0; i < recorder.durations.length; i++) {
         expect(
-          recorder.durations[i].inMilliseconds,
-          greaterThan(recorder.durations[i - 1].inMilliseconds),
-          reason: 'delay[$i] should be > delay[${i - 1}]',
-        );
+            recorder.durations[i].inMilliseconds, inInclusiveRange(0, caps[i]),
+            reason: 'delay[$i] should be in [0, ${caps[i]}]');
       }
     });
 

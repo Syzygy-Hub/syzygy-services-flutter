@@ -28,8 +28,10 @@ void main() {
       final id = device.deviceId;
       expect(id, isNotEmpty);
       // UUID format: 8-4-4-4-12
-      expect(RegExp(r'^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$')
-          .hasMatch(id), isTrue);
+      expect(
+          RegExp(r'^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$')
+              .hasMatch(id),
+          isTrue);
     });
 
     test('deviceId is stable across multiple calls', () {
@@ -50,7 +52,8 @@ void main() {
       expect(ids.toSet().length, 1);
     });
 
-    test('UUID persists across re-instantiation using syzygy.device.uuid key', () {
+    test('UUID persists across re-instantiation using syzygy.device.uuid key',
+        () {
       const key = StorageKey<String>('syzygy.device.uuid');
       final id = device.deviceId;
       // The value must be stored under the documented key.

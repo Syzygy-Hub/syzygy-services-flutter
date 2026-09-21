@@ -17,7 +17,8 @@ class Breadcrumb {
         timestampMs = DateTime.now().millisecondsSinceEpoch;
 
   @override
-  String toString() => 'Breadcrumb(msg=$message, meta=$metadata, ts=$timestampMs)';
+  String toString() =>
+      'Breadcrumb(msg=$message, meta=$metadata, ts=$timestampMs)';
 }
 
 /// Abstract contract for crash and non-fatal error reporting.
@@ -27,13 +28,13 @@ class Breadcrumb {
 abstract class CrashReporter {
   /// Records a non-fatal [error] with an optional [stackTrace] and
   /// key-value [metadata].
-  void recordError(Object error, {StackTrace? stackTrace,
-      Map<String, String> metadata = const {}});
+  void recordError(Object error,
+      {StackTrace? stackTrace, Map<String, String> metadata = const {}});
 
   /// Records a fatal crash. In production this should flush the report and
   /// may not return.
-  void recordFatal(Object error, {StackTrace? stackTrace,
-      Map<String, String> metadata = const {}});
+  void recordFatal(Object error,
+      {StackTrace? stackTrace, Map<String, String> metadata = const {}});
 
   /// Associates the current user session with [userId] and optional [email].
   void setUserContext({String? userId, String? email});
@@ -73,8 +74,8 @@ class ConsoleCrashReporter implements CrashReporter {
   List<Breadcrumb> get breadcrumbs => List.unmodifiable(_breadcrumbs);
 
   @override
-  void recordError(Object error, {StackTrace? stackTrace,
-      Map<String, String> metadata = const {}}) {
+  void recordError(Object error,
+      {StackTrace? stackTrace, Map<String, String> metadata = const {}}) {
     final merged = {..._metadata, ...metadata};
     // ignore: avoid_print
     print('[CrashReporter] NON-FATAL: $error\n'
@@ -85,8 +86,8 @@ class ConsoleCrashReporter implements CrashReporter {
   }
 
   @override
-  void recordFatal(Object error, {StackTrace? stackTrace,
-      Map<String, String> metadata = const {}}) {
+  void recordFatal(Object error,
+      {StackTrace? stackTrace, Map<String, String> metadata = const {}}) {
     final merged = {..._metadata, ...metadata};
     // ignore: avoid_print
     print('[CrashReporter] FATAL: $error\n'
@@ -149,8 +150,8 @@ class InMemoryCrashReporter implements CrashReporter {
   List<Breadcrumb> get breadcrumbs => List.unmodifiable(_breadcrumbs);
 
   @override
-  void recordError(Object error, {StackTrace? stackTrace,
-      Map<String, String> metadata = const {}}) {
+  void recordError(Object error,
+      {StackTrace? stackTrace, Map<String, String> metadata = const {}}) {
     errors.add({
       'error': error,
       'stackTrace': stackTrace,
@@ -160,8 +161,8 @@ class InMemoryCrashReporter implements CrashReporter {
   }
 
   @override
-  void recordFatal(Object error, {StackTrace? stackTrace,
-      Map<String, String> metadata = const {}}) {
+  void recordFatal(Object error,
+      {StackTrace? stackTrace, Map<String, String> metadata = const {}}) {
     fatals.add({
       'error': error,
       'stackTrace': stackTrace,

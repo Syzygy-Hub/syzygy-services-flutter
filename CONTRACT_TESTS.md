@@ -60,8 +60,8 @@ implemented in this repo's test suite; tests marked 🔲 are not yet implemented
 | Test | Status |
 |------|--------|
 | Registers for notifications without throwing | ✅ |
-| NotificationPayload.alert() creates correct payload | ✅ |
-| NotificationPayload.silent() creates correct payload | ✅ |
+| NotificationPayload.alert() creates correct payload | ❌ (test not yet implemented) |
+| NotificationPayload.silent() creates correct payload | ❌ (test not yet implemented) |
 
 ## DeviceServices
 
@@ -106,3 +106,13 @@ implemented in this repo's test suite; tests marked 🔲 are not yet implemented
 | sendBytes() emits to binary stream | ✅ |
 | dispose() closes connection | ✅ |
 | dispose() is idempotent | ✅ |
+
+## Idempotency Tests
+
+| Module | Scenario | Status |
+|--------|----------|--------|
+| networking | `dispose()` called twice does not throw | ❌ (test not yet implemented) |
+| websocket | `disconnect()` called before `connect()` does not throw | ❌ (test not yet implemented) |
+| websocket | `disconnect()` called twice does not throw | ❌ (test not yet implemented) |
+| auth | `signOut()` called when already signed out does not throw | ❌ (test not yet implemented) |
+| persistence | `clear()` called on empty store does not throw | ❌ (test not yet implemented) |

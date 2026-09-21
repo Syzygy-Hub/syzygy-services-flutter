@@ -98,7 +98,8 @@ void main() {
         expect(binaryReceived[1], equals(Uint8List.fromList([0xBB])));
       });
 
-      test('binary frames also appear on the generic messages stream', () async {
+      test('binary frames also appear on the generic messages stream',
+          () async {
         final payload = Uint8List.fromList([0x01, 0x02]);
         final allMessages = <dynamic>[];
         final sub = provider.messages.listen(allMessages.add);
@@ -124,13 +125,14 @@ void main() {
 
       expect(received, hasLength(1));
       final msg = received.first;
-      expect(msg, isA<List>());
-      expect(List<int>.from(msg as List), equals([0x00, 0x01, 0xFF, 0xFE]));
+      expect(msg, isA<List<dynamic>>());
+      expect(List<int>.from(msg as List<dynamic>),
+          equals([0x00, 0x01, 0xFF, 0xFE]));
     });
 
     test('receive binary data via stream matches sent bytes exactly', () async {
-      final data = Uint8List.fromList(
-          List<int>.generate(256, (i) => i)); // 0x00..0xFF
+      final data =
+          Uint8List.fromList(List<int>.generate(256, (i) => i)); // 0x00..0xFF
       final received = <dynamic>[];
       final sub = provider.messages.listen(received.add);
 
@@ -158,14 +160,14 @@ void main() {
       expect(received[0], isA<String>());
       expect(received[0], 'hello');
 
-      expect(received[1], isA<List>());
-      expect(List<int>.from(received[1] as List), [1, 2, 3]);
+      expect(received[1], isA<List<dynamic>>());
+      expect(List<int>.from(received[1] as List<dynamic>), [1, 2, 3]);
 
       expect(received[2], isA<String>());
       expect(received[2], 'world');
 
-      expect(received[3], isA<List>());
-      expect(List<int>.from(received[3] as List), [4, 5, 6]);
+      expect(received[3], isA<List<dynamic>>());
+      expect(List<int>.from(received[3] as List<dynamic>), [4, 5, 6]);
     });
 
     test('sendBytes with empty list sends empty binary frame', () async {

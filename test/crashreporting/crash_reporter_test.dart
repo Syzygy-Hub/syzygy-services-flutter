@@ -35,8 +35,8 @@ void main() {
 
     test('recordFatal does not throw (stub)', () {
       expect(
-        () => reporter.recordFatal(Exception('fatal'),
-            metadata: {'severity': 'high'}),
+        () => reporter
+            .recordFatal(Exception('fatal'), metadata: {'severity': 'high'}),
         returnsNormally,
       );
     });

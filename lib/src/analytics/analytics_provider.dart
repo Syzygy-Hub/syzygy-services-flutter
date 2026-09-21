@@ -1,5 +1,7 @@
 import 'package:syzygy_foundation_flutter/syzygy_foundation_flutter.dart';
 
+import '../internal/redaction_policy.dart';
+
 /// Extends the Foundation [AnalyticsProvider] contract with screen tracking
 /// and session management.
 abstract class ServicesAnalyticsProvider implements AnalyticsProvider {
@@ -17,9 +19,14 @@ abstract class ServicesAnalyticsProvider implements AnalyticsProvider {
 class ConsoleAnalyticsProvider implements ServicesAnalyticsProvider {
   String _sessionId;
 
+  /// Output sink — defaults to [print]. Inject a custom logger in tests to
+  /// capture and assert on log output.
+  final void Function(String) _logger;
+
   /// Creates a [ConsoleAnalyticsProvider] with an auto-generated session ID.
-  ConsoleAnalyticsProvider()
-      : _sessionId = SyzygyID.generate<ConsoleAnalyticsProvider>().rawValue;
+  ConsoleAnalyticsProvider({void Function(String)? logger})
+      : _sessionId = SyzygyID.generate<ConsoleAnalyticsProvider>().rawValue,
+        _logger = logger ?? print;
 
   @override
   String get sessionId => _sessionId;
@@ -31,22 +38,24 @@ class ConsoleAnalyticsProvider implements ServicesAnalyticsProvider {
       properties: {'session_id': _sessionId, ...event.properties},
       timestamp: event.timestamp,
     );
-    // ignore: avoid_print
-    print('[Analytics] event=${enriched.name} props=${enriched.properties} '
+    _logger('[Analytics] event=${enriched.name} props=${enriched.properties} '
         'session=$_sessionId ts=${enriched.timestamp.millisecondsSinceEpoch}');
   }
 
   @override
   void identify(String userId, Map<String, Object?> traits) {
-    // ignore: avoid_print
-    print('[Analytics] identify userId=$userId traits=$traits');
+    final redactedUserId = redact('userId', userId);
+    final redactedTraits = redactMap(
+      traits.map((key, value) => MapEntry(key, value?.toString() ?? '')),
+    );
+    _logger(
+        '[Analytics] identify userId=$redactedUserId traits=$redactedTraits');
   }
 
   @override
   void reset() {
     _sessionId = SyzygyID.generate<ConsoleAnalyticsProvider>().rawValue;
-    // ignore: avoid_print
-    print('[Analytics] reset — new session=$_sessionId');
+    _logger('[Analytics] reset — new session=$_sessionId');
   }
 
   @override
@@ -108,5 +117,6 @@ class InMemoryAnalyticsProvider implements ServicesAnalyticsProvider {
   }
 
   /// Returns the properties map for [userId], or `null` if not identified.
-  Map<String, Object?>? userProperties(String userId) => _userProperties[userId];
+  Map<String, Object?>? userProperties(String userId) =>
+      _userProperties[userId];
 }

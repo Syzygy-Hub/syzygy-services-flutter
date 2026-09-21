@@ -2,8 +2,20 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:syzygy_foundation_flutter/syzygy_foundation_flutter.dart';
 import 'package:syzygy_services_flutter/syzygy_services_flutter.dart';
 import 'package:test/test.dart';
+
+// ---------------------------------------------------------------------------
+// Recording logger for MED-09 tests.
+// ---------------------------------------------------------------------------
+
+class _RecordingLogger extends LoggerProtocol {
+  final entries = <LogEntry>[];
+
+  @override
+  void log(LogEntry entry) => entries.add(entry);
+}
 
 // ---------------------------------------------------------------------------
 // Minimal HTTP fake (same pattern as other test files)
@@ -283,6 +295,33 @@ void main() {
       final p = InMemoryRemoteConfigProvider(remoteValues: {'x': 1});
       await p.fetch();
       expect(p.lastFetchTime, isNotNull);
+    });
+  });
+
+  group('NetworkRemoteConfigProvider logger (MED-09)', () {
+    const configUrl = 'https://config.example.com/remote.json';
+
+    test('fetch failure logs a warning', () async {
+      final logger = _RecordingLogger();
+      final http = _CountingFakeHttpClient(
+        responseBody: {},
+        statusCode: 503,
+      );
+      final provider = NetworkRemoteConfigProvider(
+        client: HttpNetworkClient(client: http, maxRetries: 1),
+        configUrl: configUrl,
+        logger: logger,
+      );
+
+      await provider.fetch();
+
+      expect(
+        logger.entries.any((e) =>
+            e.level == LogLevel.warning &&
+            e.message.contains('RemoteConfigProvider: fetch failed')),
+        isTrue,
+        reason: 'Expected a warning log entry on fetch failure',
+      );
     });
   });
 }

@@ -10,7 +10,7 @@
 /// These tests do NOT test behaviour in depth — see the per-module test files
 /// for behavioural coverage. The goal here is a fast, compile-time-verified
 /// smoke check that no service has drifted from its Foundation contract.
-library syzygy_services_flutter.test.contract_compliance;
+library;
 
 import 'dart:typed_data';
 
@@ -19,8 +19,7 @@ import 'package:syzygy_services_flutter/syzygy_services_flutter.dart';
 import 'package:test/test.dart';
 
 // A JWT valid until 2030: {"sub":"1","exp":1893456000}
-const _validJwt =
-    'eyJhbGciOiJIUzI1NiJ9'
+const _validJwt = 'eyJhbGciOiJIUzI1NiJ9'
     '.eyJzdWIiOiIxIiwiZXhwIjoxODkzNDU2MDAwfQ'
     '.signature';
 
@@ -294,7 +293,9 @@ void main() {
 
     test('deepLink() stores route in data', () {
       final p = NotificationPayload.deepLink(
-        title: 'T', body: 'B', route: '/home',
+        title: 'T',
+        body: 'B',
+        route: '/home',
       );
       expect(p.data['route'], '/home');
     });
