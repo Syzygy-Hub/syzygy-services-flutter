@@ -369,25 +369,3 @@ class _RecoveringHttpClient implements HttpClient {
   @override
   dynamic noSuchMethod(Invocation i) => super.noSuchMethod(i);
 }
-
-/// Calls [onOpen] async on each [openUrl].
-class _CallbackHttpClient implements HttpClient {
-  final Future<void> Function() onOpen;
-
-  _CallbackHttpClient({required this.onOpen});
-
-  @override
-  Future<HttpClientRequest> openUrl(String method, Uri url) async {
-    await onOpen();
-    throw const SocketException('should not reach');
-  }
-
-  @override
-  set connectionTimeout(Duration? v) {}
-  @override
-  Duration? get connectionTimeout => null;
-  @override
-  void close({bool force = false}) {}
-  @override
-  dynamic noSuchMethod(Invocation i) => super.noSuchMethod(i);
-}
