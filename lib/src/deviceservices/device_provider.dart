@@ -2,7 +2,7 @@ import 'dart:io';
 
 import 'package:syzygy_foundation_flutter/syzygy_foundation_flutter.dart';
 
-import '../persistence/storage_provider.dart';
+import '../version.dart';
 
 const _deviceIdKey = StorageKey<String>('syzygy.device.uuid');
 
@@ -24,12 +24,12 @@ abstract class DeviceProvider {
   bool get isSimulator;
 }
 
-/// [DeviceProvider] backed by [dart:io] and [InMemoryStorageProvider].
+/// [DeviceProvider] backed by [dart:io] and a [StorageProvider].
 ///
 /// The [deviceId] is generated once and persisted via [StorageProvider] so
 /// it survives process restarts within the same storage instance.
 class IoDeviceProvider implements DeviceProvider {
-  final InMemoryStorageProvider _storage;
+  final StorageProvider _storage;
 
   /// Creates an [IoDeviceProvider] that persists the device ID via [storage].
   IoDeviceProvider(this._storage);
@@ -50,7 +50,7 @@ class IoDeviceProvider implements DeviceProvider {
   String get osVersion => Platform.operatingSystemVersion;
 
   @override
-  String get appVersion => '1.0.0';
+  String get appVersion => kSyzygyServicesVersion;
 
   @override
   bool get isSimulator =>

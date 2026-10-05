@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.0.0] - 2026-10-06
+
+### Changed
+- CI migrated from inline workflow to Syzygy-Hub reusable workflow (`flutter-ci.yml`)
+- Foundation dependency constraint updated to `>=3.0.0`
+
+### Fixed
+- Biometric TODO comments re-tagged to `TODO(Foundation-future)`
+- `IoDeviceProvider` DI violation fixed — now takes abstract `StorageProvider`
+- `appVersion` now returns dynamic package version
+- Fake HTTP client boilerplate extracted to `test/helpers/fake_http_client.dart`
+
+---
+
 ## [1.2.0] - 2026-09-19
 
 ### Fixed
@@ -69,7 +83,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - CrashReporter abstract class and console crash logging stub
 - WebSocketProvider abstract class and dart:io WebSocket stub
 
-[Unreleased]: https://github.com/Syzygy-Hub/syzygy-services-flutter/compare/1.2.0...HEAD
+[Unreleased]: https://github.com/Syzygy-Hub/syzygy-services-flutter/compare/3.0.0...HEAD
+[3.0.0]: https://github.com/Syzygy-Hub/syzygy-services-flutter/compare/1.2.0...3.0.0
 [1.2.0]: https://github.com/Syzygy-Hub/syzygy-services-flutter/compare/1.1.0...1.2.0
 [1.1.0]: https://github.com/Syzygy-Hub/syzygy-services-flutter/compare/1.0.0...1.1.0
 [1.0.0]: https://github.com/Syzygy-Hub/syzygy-services-flutter/releases/tag/1.0.0

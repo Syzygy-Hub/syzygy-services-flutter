@@ -59,5 +59,10 @@ void main() {
       // The value must be stored under the documented key.
       expect(storage.get<String>(key), id);
     });
+
+    test('isSimulator returns false in test environment', () {
+      // In a standard dart test environment the simulator env vars are absent.
+      expect(device.isSimulator, isFalse);
+    });
   });
 }

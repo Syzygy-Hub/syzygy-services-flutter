@@ -214,7 +214,7 @@ void main() {
       await expectLater(
         () => client.execute(const NetworkRequest(
             url: 'https://example.com/fail', method: NetworkMethod.post)),
-        throwsA(isA<NetworkError>()),
+        throwsA(isA<HttpNetworkError>()),
       );
 
       expect(logger.entries.any((e) => e.level == LogLevel.error), isTrue,

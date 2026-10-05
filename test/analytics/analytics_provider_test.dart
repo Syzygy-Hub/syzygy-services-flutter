@@ -3,6 +3,20 @@ import 'package:syzygy_services_flutter/syzygy_services_flutter.dart';
 import 'package:test/test.dart';
 
 void main() {
+  group('ConsoleAnalyticsProvider', () {
+    test('trackScreen() logs screen name', () {
+      final captured = <String>[];
+      final provider =
+          ConsoleAnalyticsProvider(logger: (msg) => captured.add(msg));
+
+      provider.trackScreen('HomeScreen');
+
+      final output = captured.join();
+      expect(output, contains('HomeScreen'),
+          reason: 'Screen name should appear in log output');
+    });
+  });
+
   // HI-06: PII redaction test for ConsoleAnalyticsProvider
   group('ConsoleAnalyticsProvider — HI-06 redaction', () {
     test('identify does not log userId or email in plain text', () {

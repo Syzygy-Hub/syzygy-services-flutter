@@ -68,5 +68,13 @@ void main() {
     test('tempDirectoryPath is non-empty', () {
       expect(provider.tempDirectoryPath, isNotEmpty);
     });
+
+    test('deleteDirectory() removes an empty directory', () async {
+      final dirPath = '${tempDir.path}/empty_dir';
+      await provider.createDirectory(dirPath);
+      expect(Directory(dirPath).existsSync(), isTrue);
+      await provider.deleteDirectory(dirPath);
+      expect(Directory(dirPath).existsSync(), isFalse);
+    });
   });
 }
