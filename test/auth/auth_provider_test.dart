@@ -73,14 +73,22 @@ void main() {
       expect(jwtIsExpired(_expiredJwt), isTrue);
     });
 
-    test('canUseBiometric returns false', () async {
-      expect(await auth.canUseBiometric(), isFalse);
+    test('canUseBiometric returns false', () {
+      expect(auth.canUseBiometric(), isFalse);
     });
 
-    test('authenticateWithBiometric returns unauthenticated', () async {
+    test('authenticateWithBiometric returns false', () async {
       final result =
           await auth.authenticateWithBiometric('Please authenticate');
-      expect(result, isA<Unauthenticated>());
+      expect(result, isFalse);
+    });
+
+    test('signOut() when already signed out does not throw and remains unauthenticated',
+        () {
+      // Initial state is already Unauthenticated — calling signOut() must not throw.
+      expect(auth.state, isA<Unauthenticated>());
+      expect(() => auth.signOut(), returnsNormally);
+      expect(auth.state, isA<Unauthenticated>());
     });
   });
 }

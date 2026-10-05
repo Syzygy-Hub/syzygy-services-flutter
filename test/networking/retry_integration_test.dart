@@ -5,137 +5,9 @@ import 'package:syzygy_foundation_flutter/syzygy_foundation_flutter.dart';
 import 'package:syzygy_services_flutter/syzygy_services_flutter.dart';
 import 'package:test/test.dart';
 
+import '../helpers/fake_http_client.dart';
+
 // kBackoffBaseMs is exported from syzygy_services_flutter via network_client.dart
-
-// ---------------------------------------------------------------------------
-// Helpers shared with network_client_test (duplicated to keep test isolation)
-// ---------------------------------------------------------------------------
-
-class _FakeHttpHeaders implements HttpHeaders {
-  final _map = <String, List<String>>{};
-
-  @override
-  void forEach(void Function(String name, List<String> values) action) =>
-      _map.forEach(action);
-
-  @override
-  void set(String name, Object value, {bool preserveHeaderCase = false}) =>
-      _map[name] = ['$value'];
-
-  @override
-  void add(String name, Object value, {bool preserveHeaderCase = false}) =>
-      _map.putIfAbsent(name, () => []).add('$value');
-
-  @override
-  List<String>? operator [](String name) => _map[name];
-
-  @override
-  String? value(String name) => _map[name]?.first;
-
-  @override
-  void clear() => _map.clear();
-
-  @override
-  void remove(String name, Object value) {}
-
-  @override
-  void removeAll(String name) => _map.remove(name);
-
-  @override
-  bool get chunkedTransferEncoding => false;
-  @override
-  set chunkedTransferEncoding(bool v) {}
-  @override
-  int get contentLength => -1;
-  @override
-  set contentLength(int v) {}
-  @override
-  ContentType? get contentType => null;
-  @override
-  set contentType(ContentType? v) {}
-  @override
-  DateTime? get date => null;
-  @override
-  set date(DateTime? v) {}
-  @override
-  DateTime? get expires => null;
-  @override
-  set expires(DateTime? v) {}
-  @override
-  String? get host => null;
-  @override
-  set host(String? v) {}
-  @override
-  DateTime? get ifModifiedSince => null;
-  @override
-  set ifModifiedSince(DateTime? v) {}
-  @override
-  bool get persistentConnection => true;
-  @override
-  set persistentConnection(bool v) {}
-  @override
-  int? get port => null;
-  @override
-  set port(int? v) {}
-
-  @override
-  dynamic noSuchMethod(Invocation i) => super.noSuchMethod(i);
-}
-
-class _FakeHttpClientResponse extends Stream<List<int>>
-    implements HttpClientResponse {
-  final int _status;
-  final List<int> _body;
-  final _FakeHttpHeaders _hdrs = _FakeHttpHeaders();
-
-  _FakeHttpClientResponse(this._status, this._body);
-
-  @override
-  int get statusCode => _status;
-
-  @override
-  HttpHeaders get headers => _hdrs;
-
-  @override
-  StreamSubscription<List<int>> listen(
-    void Function(List<int> event)? onData, {
-    Function? onError,
-    void Function()? onDone,
-    bool? cancelOnError,
-  }) {
-    return Stream<List<int>>.fromIterable([_body]).listen(
-      onData,
-      onError: onError,
-      onDone: onDone,
-      cancelOnError: cancelOnError,
-    );
-  }
-
-  @override
-  dynamic noSuchMethod(Invocation i) => super.noSuchMethod(i);
-}
-
-class _FakeHttpClientRequest implements HttpClientRequest {
-  final _FakeHttpClientResponse _response;
-  final _FakeHttpHeaders _hdrs = _FakeHttpHeaders();
-
-  _FakeHttpClientRequest(this._response);
-
-  @override
-  HttpHeaders get headers => _hdrs;
-
-  @override
-  void add(List<int> data) {}
-
-  @override
-  void write(Object? obj) {}
-
-  @override
-  Future<HttpClientResponse> close() async => _response;
-
-  @override
-  dynamic noSuchMethod(Invocation i) => super.noSuchMethod(i);
-}
 
 // ---------------------------------------------------------------------------
 // Counting HttpClient — tracks openUrl call count; configurable per-call responses
@@ -145,7 +17,7 @@ class _CountingHttpClient implements HttpClient {
   int callCount = 0;
 
   /// Responses in order; the last one is repeated once exhausted.
-  final List<_FakeHttpClientResponse> _responses;
+  final List<FakeHttpClientResponse> _responses;
 
   _CountingHttpClient(this._responses);
 
@@ -154,35 +26,8 @@ class _CountingHttpClient implements HttpClient {
     final idx =
         callCount < _responses.length ? callCount : _responses.length - 1;
     callCount++;
-    return _FakeHttpClientRequest(_responses[idx]);
+    return FakeHttpClientRequest(_responses[idx]);
   }
-
-  @override
-  set connectionTimeout(Duration? v) {}
-
-  @override
-  Duration? get connectionTimeout => null;
-
-  @override
-  void close({bool force = false}) {}
-
-  @override
-  dynamic noSuchMethod(Invocation i) => super.noSuchMethod(i);
-}
-
-// ---------------------------------------------------------------------------
-// Simple fake HttpClient (used by injectable-clock tests)
-// ---------------------------------------------------------------------------
-
-class _FakeHttpClient implements HttpClient {
-  final int statusCode;
-  final List<int> body;
-
-  _FakeHttpClient({this.statusCode = 200, this.body = const []});
-
-  @override
-  Future<HttpClientRequest> openUrl(String method, Uri url) async =>
-      _FakeHttpClientRequest(_FakeHttpClientResponse(statusCode, body));
 
   @override
   set connectionTimeout(Duration? v) {}
@@ -214,7 +59,7 @@ void main() {
     test('retry fires correct number of times on persistent failure', () async {
       // Server always returns 500; maxRetries=3 means 3 total attempts.
       final http = _CountingHttpClient(
-        [_FakeHttpClientResponse(500, [])],
+        [FakeHttpClientResponse(500, [])],
       );
       final client = HttpNetworkClient(
         client: http,
@@ -226,7 +71,7 @@ void main() {
         () => client.execute(
           const NetworkRequest(url: url, method: NetworkMethod.get),
         ),
-        throwsA(isA<NetworkError>()
+        throwsA(isA<HttpNetworkError>()
             .having((e) => e.code, 'code', SyzygyErrorCode.serverError)),
       );
 
@@ -256,7 +101,7 @@ void main() {
         () => client.execute(
           const NetworkRequest(url: url, method: NetworkMethod.get),
         ),
-        throwsA(isA<NetworkError>()
+        throwsA(isA<HttpNetworkError>()
             .having((e) => e.code, 'code', SyzygyErrorCode.networkUnavailable)),
       );
 
@@ -269,7 +114,7 @@ void main() {
       var calls = 0;
       final customClient = _RecoveringHttpClient(
         failFor: 2,
-        successResponse: _FakeHttpClientResponse(200, []),
+        successResponse: FakeHttpClientResponse(200, []),
         onCall: () => calls++,
       );
 
@@ -287,43 +132,47 @@ void main() {
       expect(calls, 3); // 2 failures + 1 success
     });
 
-    test('exponential backoff delay doubles with each attempt', () async {
-      // We verify that delays grow by recording wall-clock time between attempts.
-      // To keep tests fast, we use a tiny base delay and just check ordering.
-      final delays = <Duration>[];
-      DateTime? lastCall;
+    test('exponential backoff delay ceiling doubles with each attempt',
+        () async {
+      // Previously this test measured real wall-clock deltas and asserted
+      // delays[1] > delays[0].  That assertion is inherently flaky with
+      // full-jitter backoff: both values are uniformly random in their
+      // respective windows, so a high attempt-0 sample and a low attempt-1
+      // sample can invert the order on any run.
+      //
+      // Fix: inject RecordingBackoffClock so no real sleep occurs and assert
+      // on the *ceiling* property (attempt 1's upper bound is 2× attempt 0's),
+      // which is deterministic regardless of the random sample.
+      final recorder = RecordingBackoffClock();
 
-      final customClient = _CallbackHttpClient(
-        onOpen: () async {
-          final now = DateTime.now();
-          if (lastCall != null) {
-            delays.add(now.difference(lastCall!));
-          }
-          lastCall = now;
-          throw const SocketException('simulated');
-        },
-      );
-
-      // maxRetries=3 gives attempt 0 (delay 200ms*1), 1 (delay 200ms*2), then throws.
-      // We use a short timeout to speed up the test.
       final client = HttpNetworkClient(
-        client: customClient,
+        client: _ThrowingHttpClient(
+          onOpen: () => throw const SocketException('simulated'),
+        ),
         maxRetries: 3,
-        timeout: const Duration(milliseconds: 1),
+        backoffClock: recorder.call,
       );
 
       await expectLater(
         () => client.execute(
           const NetworkRequest(url: url, method: NetworkMethod.get),
         ),
-        throwsA(isA<NetworkError>()),
+        throwsA(isA<HttpNetworkError>()),
       );
 
-      // At least 2 inter-attempt intervals recorded; second should be longer.
-      expect(delays.length, greaterThanOrEqualTo(1));
-      if (delays.length >= 2) {
-        expect(delays[1].inMilliseconds, greaterThan(delays[0].inMilliseconds));
-      }
+      // maxRetries=3 → attempt 0 (delay), attempt 1 (delay), attempt 2 (throws)
+      // → 2 delays recorded.
+      expect(recorder.durations, hasLength(2));
+      // attempt 0: jitter in [0, min(8000, 500*2^0)] = [0, 500]
+      expect(recorder.durations[0].inMilliseconds,
+          inInclusiveRange(0, kBackoffBaseMs));
+      // attempt 1: jitter in [0, min(8000, 500*2^1)] = [0, 1000]
+      expect(recorder.durations[1].inMilliseconds,
+          inInclusiveRange(0, kBackoffBaseMs * 2));
+      // The ceiling for attempt 1 must be strictly larger than attempt 0's
+      // ceiling — this is the deterministic property the test was originally
+      // trying to capture.
+      expect(kBackoffBaseMs * 2, greaterThan(kBackoffBaseMs));
     });
   });
 
@@ -353,7 +202,7 @@ void main() {
         () => client.execute(
           const NetworkRequest(url: url, method: NetworkMethod.get),
         ),
-        throwsA(isA<NetworkError>()),
+        throwsA(isA<HttpNetworkError>()),
       );
 
       // attempt 0 → jitter in [0, min(8000, 500*2^0)] = [0, 500]
@@ -381,7 +230,7 @@ void main() {
         () => client.execute(
           const NetworkRequest(url: url, method: NetworkMethod.get),
         ),
-        throwsA(isA<NetworkError>()),
+        throwsA(isA<HttpNetworkError>()),
       );
 
       // maxRetries=1 means attempt 0 is the final attempt — no delay before it.
@@ -404,7 +253,7 @@ void main() {
         () => client.execute(
           const NetworkRequest(url: url, method: NetworkMethod.get),
         ),
-        throwsA(isA<NetworkError>()),
+        throwsA(isA<HttpNetworkError>()),
       );
 
       expect(recorder.durations, hasLength(retries - 1));
@@ -426,7 +275,7 @@ void main() {
         () => client.execute(
           const NetworkRequest(url: url, method: NetworkMethod.get),
         ),
-        throwsA(isA<NetworkError>()),
+        throwsA(isA<HttpNetworkError>()),
       );
 
       // 4 delays for maxRetries=5 (attempts 0..3 each get a delay before next attempt)
@@ -443,7 +292,7 @@ void main() {
       final recorder = RecordingBackoffClock();
 
       final client = HttpNetworkClient(
-        client: _FakeHttpClient(statusCode: 500, body: []),
+        client: FakeHttpClient(statusCode: 500, body: []),
         maxRetries: 3,
         backoffClock: recorder.call,
       );
@@ -452,7 +301,7 @@ void main() {
         () => client.execute(
           const NetworkRequest(url: url, method: NetworkMethod.get),
         ),
-        throwsA(isA<NetworkError>()),
+        throwsA(isA<HttpNetworkError>()),
       );
 
       // 500 is not retryable — no delays should be recorded.
@@ -490,7 +339,7 @@ class _ThrowingHttpClient implements HttpClient {
 /// Throws [SocketException] for the first [failFor] calls, then returns [successResponse].
 class _RecoveringHttpClient implements HttpClient {
   final int failFor;
-  final _FakeHttpClientResponse successResponse;
+  final FakeHttpClientResponse successResponse;
   final void Function() onCall;
   int _calls = 0;
 
@@ -508,29 +357,7 @@ class _RecoveringHttpClient implements HttpClient {
       throw const SocketException('simulated failure');
     }
     _calls++;
-    return _FakeHttpClientRequest(successResponse);
-  }
-
-  @override
-  set connectionTimeout(Duration? v) {}
-  @override
-  Duration? get connectionTimeout => null;
-  @override
-  void close({bool force = false}) {}
-  @override
-  dynamic noSuchMethod(Invocation i) => super.noSuchMethod(i);
-}
-
-/// Calls [onOpen] async on each [openUrl].
-class _CallbackHttpClient implements HttpClient {
-  final Future<void> Function() onOpen;
-
-  _CallbackHttpClient({required this.onOpen});
-
-  @override
-  Future<HttpClientRequest> openUrl(String method, Uri url) async {
-    await onOpen();
-    throw const SocketException('should not reach');
+    return FakeHttpClientRequest(successResponse);
   }
 
   @override

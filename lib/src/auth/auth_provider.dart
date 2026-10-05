@@ -68,7 +68,7 @@ class TokenAuthProvider implements AuthProvider {
   /// [storage] MUST be backed by a secure storage implementation
   /// (e.g. flutter_secure_storage). Tokens stored in a non-secure
   /// provider are accessible to other apps on rooted devices.
-  /// TODO(Foundation-v1.2.0): enforce SecureStorageProvider type.
+  /// TODO(Foundation-future): biometric implementation pending Foundation adding native biometric support
   ///
   /// Supply [networkClient] and [refreshEndpoint] to enable real token refresh.
   TokenAuthProvider(
@@ -211,13 +211,26 @@ class TokenAuthProvider implements AuthProvider {
   /// Returns whether biometric authentication is available on this device.
   /// Always returns `false` in the stub. Wire to `local_auth` package's
   /// `LocalAuthentication.canCheckBiometrics` for real Face ID / Touch ID / fingerprint support.
-  Future<bool> canUseBiometric() async => false;
+  @override
+  bool canUseBiometric() => false;
 
   /// Authenticates the user with biometrics.
   /// [reason] is the localized reason shown to the user in the system prompt.
-  /// Returns [Unauthenticated] on the stub. Wire to `local_auth` for real usage.
-  Future<AuthState> authenticateWithBiometric(String reason) async =>
-      const Unauthenticated();
+  /// Returns `false` on the stub. Wire to `local_auth` for real usage.
+  @override
+  Future<bool> authenticateWithBiometric(String reason) async => false;
+
+  /// Silently refreshes the current session token.
+  /// Returns `true` on success, `false` if refresh is unavailable or fails.
+  @override
+  Future<bool> refreshToken() async {
+    try {
+      await refresh();
+      return true;
+    } catch (_) {
+      return false;
+    }
+  }
 
   /// Disposes the stream controller.
   void dispose() => _controller.close();

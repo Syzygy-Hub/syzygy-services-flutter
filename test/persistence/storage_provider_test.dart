@@ -70,6 +70,11 @@ void main() {
       expect(storage.get<String>(stringKey), 'hello');
     });
 
+    test('clear() on empty store succeeds without throwing', () {
+      // Storage was just created in setUp — it is empty.
+      expect(() => storage.clear(), returnsNormally);
+    });
+
     test('concurrent reads return consistent values', () async {
       const key = StorageKey<String>('test.concurrent');
       storage.set<String>('value', key);

@@ -32,7 +32,7 @@ Duration backoffDelay(int attempt) {
 }
 
 /// Error raised when an HTTP operation fails.
-class NetworkError implements SyzygyError {
+class HttpNetworkError implements SyzygyError {
   @override
   final SyzygyErrorCode code;
 
@@ -45,8 +45,8 @@ class NetworkError implements SyzygyError {
   @override
   final Object? underlyingError;
 
-  /// Creates a [NetworkError] with the given fields.
-  const NetworkError({
+  /// Creates a [HttpNetworkError] with the given fields.
+  const HttpNetworkError({
     required this.code,
     required this.message,
     this.severity = SyzygyErrorSeverity.error,
@@ -54,7 +54,7 @@ class NetworkError implements SyzygyError {
   });
 
   @override
-  String toString() => 'NetworkError(${code.rawValue}): $message';
+  String toString() => 'HttpNetworkError(${code.rawValue}): $message';
 }
 
 /// Abstract interceptor for modifying requests before they are sent.
@@ -158,7 +158,7 @@ class HttpNetworkClient implements NetworkClientProtocol {
       NetworkRequest request, int attempt) async {
     try {
       return await _doExecute(request);
-    } on NetworkError catch (e) {
+    } on HttpNetworkError catch (e) {
       if (attempt >= maxRetries - 1) rethrow;
       if (e.code == SyzygyErrorCode.timeout ||
           e.code == SyzygyErrorCode.networkUnavailable) {
@@ -192,12 +192,12 @@ class HttpNetworkClient implements NetworkClientProtocol {
 
     try {
       httpReq = await _client.openUrl(method, uri).timeout(timeout,
-          onTimeout: () => throw NetworkError(
+          onTimeout: () => throw HttpNetworkError(
                 code: SyzygyErrorCode.timeout,
                 message: 'Request timed out: ${request.url}',
               ));
     } on SocketException catch (e) {
-      final err = NetworkError(
+      final err = HttpNetworkError(
         code: SyzygyErrorCode.networkUnavailable,
         message: 'Network unavailable: $e',
         underlyingError: e,
@@ -215,13 +215,13 @@ class HttpNetworkClient implements NetworkClientProtocol {
     late HttpClientResponse httpRes;
     try {
       httpRes = await httpReq.close().timeout(timeout, onTimeout: () {
-        throw NetworkError(
+        throw HttpNetworkError(
           code: SyzygyErrorCode.timeout,
           message: 'Response timed out: ${request.url}',
         );
       });
     } on SocketException catch (e) {
-      throw NetworkError(
+      throw HttpNetworkError(
         code: SyzygyErrorCode.networkUnavailable,
         message: 'Network unavailable: $e',
         underlyingError: e,
@@ -242,7 +242,7 @@ class HttpNetworkClient implements NetworkClientProtocol {
     );
 
     if (response.isServerError) {
-      final error = NetworkError(
+      final error = HttpNetworkError(
         code: SyzygyErrorCode.serverError,
         message: 'Server error ${httpRes.statusCode}',
       );
@@ -364,6 +364,7 @@ class HttpNetworkClient implements NetworkClientProtocol {
   ///
   /// Sets an internal disposed flag and closes the underlying [HttpClient]
   /// forcefully. Safe to call multiple times — subsequent calls are no-ops.
+  @override
   void dispose() {
     if (_disposed) return;
     _disposed = true;

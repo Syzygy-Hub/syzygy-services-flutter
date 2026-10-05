@@ -56,5 +56,15 @@ void main() {
       await provider.disconnect();
       expect(provider.connectionState, WebSocketConnectionState.disconnected);
     });
+
+    test('disconnect() before connect() does not throw', () async {
+      await expectLater(provider.disconnect(), completes);
+    });
+
+    test('disconnect() called twice does not throw', () async {
+      await provider.connect('ws://localhost');
+      await provider.disconnect();
+      await expectLater(provider.disconnect(), completes);
+    });
   });
 }
